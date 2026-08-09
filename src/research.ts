@@ -136,11 +136,9 @@ Respond with only the single word.`;
 }
 
 function getApiKey(): string {
-  // 1. Build-time env var (from .env via rsbuild — preferred, never committed)
-  //    Rsbuild loadEnv exposes OPENAI_API_KEY as process.env.OPENAI_API_KEY
-  const envKey = (process.env as Record<string, string | undefined>).OPENAI_API_KEY;
-  if (envKey && envKey !== 'undefined') return envKey;
-  // 2. Runtime override stored in localStorage (settings screen / DevTools fallback)
+  // Runtime key only. We never inline the key at build time — a mini app is
+  // client-side code, so a bundled key would be public. The user provides their
+  // key in the Settings screen; it lives in this browser's localStorage.
   try {
     return localStorage.getItem('dialed:openai-key') ?? '';
   } catch {

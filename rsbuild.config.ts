@@ -1,8 +1,6 @@
-import { defineConfig, loadEnv } from '@rsbuild/core';
+import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { withZephyr } from 'zephyr-rsbuild-plugin';
-
-const { publicVars } = loadEnv({ prefixes: ['OPENAI_'] });
 
 export default defineConfig({
   // withZephyr() makes `pnpm build` publish an immutable release to Zephyr Cloud.
@@ -15,7 +13,9 @@ export default defineConfig({
     alias: {
       '@': './src',
     },
-    define: publicVars,
+    // NOTE: we deliberately do NOT inline OPENAI_API_KEY into the client bundle.
+    // A mini app is client-side code — a bundled key is a public key. The key is
+    // provided at runtime via the Settings screen (localStorage). See research.ts.
   },
   html: {
     template: './src/index.html',
