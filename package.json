@@ -4,7 +4,13 @@
   "private": true,
   "type": "module",
   "description": "Coffee dial-in coach for Fellow Aiden + Opus V1",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10.33.1"
+  },
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "typecheck": "tsc --noEmit",
