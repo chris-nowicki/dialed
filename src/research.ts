@@ -3,18 +3,124 @@
  * The LLM classifies the bean and returns structured data.
  * The grind engine owns all numbers — the LLM never invents a grind setting.
  *
- * Graceful degrade: if the network call fails, derive a starting recipe
- * from roast level alone (the user must supply roast).
+ * Transport (see also DEPLOY.md / manifest permissions):
+ *   1. Preferred — the platform's host-managed HTTP credential. On desktop
+ *      surfaces, `sdk.http.request({ credentialRef })` sends the call and the
+ *      HOST injects the OpenAI key server-side. The key never enters this
+ *      bundle. This is the correct architecture for a client-side mini app.
+ *   2. Fallback — a runtime user key from the Settings screen (localStorage),
+ *      used via browser fetch when the host HTTP capability isn't available
+ *      (e.g. mobile/portable targets).
+ *
+ * Graceful degrade: if neither transport can complete, callers fall back to a
+ * roast-level-only starting recipe (researchBean) or re-prompt (classify).
  */
 
+import { sdk } from '@theaiplatform/miniapp-sdk';
 import type { BeanResearchResult, RoastLevel } from './types';
+
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const LOCAL_KEY = 'dialed:openai-key';
 
 export interface ResearchRequest {
   roaster: string;
   name: string;
 }
 
-// Fallback when network is unavailable or LLM call fails
+// ---------------------------------------------------------------------------
+// Transport
+// ---------------------------------------------------------------------------
+
+let cachedCredentialRef: string | null | undefined;
+
+/**
+ * Discover a host-managed OpenAI bearer credential, if one is registered in
+ * The AI Platform. Returns the opaque credentialRef (never the secret).
+ */
+async function getCredentialRef(): Promise<string | null> {
+  if (cachedCredentialRef !== undefined) return cachedCredentialRef;
+  try {
+    if (sdk?.credentials?.listHttp) {
+      const creds = await sdk.credentials.listHttp();
+      const match = creds.find(
+        (c) => c.credentialType === 'http_bearer' && /openai/i.test(c.displayName),
+      );
+      cachedCredentialRef = match?.id ?? null;
+    } else {
+      cachedCredentialRef = null;
+    }
+  } catch {
+    cachedCredentialRef = null;
+  }
+  return cachedCredentialRef;
+}
+
+/**
+ * POST a Chat Completions body and return the parsed JSON response, or null on
+ * any failure. Prefers the host credential; falls back to the runtime key.
+ */
+async function chatCompletion(body: unknown): Promise<unknown | null> {
+  const payload = JSON.stringify(body);
+
+  // 1. Host-managed credential — key stays in the platform vault.
+  const ref = await getCredentialRef();
+  if (sdk?.http?.request && ref) {
+    try {
+      const resp = await sdk.http.request(
+        {
+          method: 'POST',
+          url: OPENAI_URL,
+          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          body: payload,
+          timeoutMs: 15000,
+        },
+        { credentialRef: ref },
+      );
+      if (resp.status < 200 || resp.status >= 300 || !resp.bodyText) {
+        console.warn('[Dialed] Host research call failed:', resp.status);
+        return null;
+      }
+      return JSON.parse(resp.bodyText) as unknown;
+    } catch (err) {
+      console.warn('[Dialed] Host research call error:', err);
+      return null;
+    }
+  }
+
+  // 2. Fallback — runtime user key via browser fetch (portable targets).
+  const key = getLocalKey();
+  if (!key) return null;
+  try {
+    const resp = await fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`,
+      },
+      body: payload,
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) {
+      console.warn('[Dialed] Research API error:', resp.status);
+      return null;
+    }
+    return (await resp.json()) as unknown;
+  } catch (err) {
+    console.warn('[Dialed] Research fetch error:', err);
+    return null;
+  }
+}
+
+function firstChoiceContent(data: unknown): string | null {
+  const choices = (data as { choices?: Array<{ message?: { content?: string } }> })?.choices;
+  return choices?.[0]?.message?.content ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Research
+// ---------------------------------------------------------------------------
+
+// Fallback when the LLM call can't complete.
 function fallbackResearch(roast: RoastLevel): BeanResearchResult {
   return {
     roast,
@@ -27,13 +133,6 @@ function fallbackResearch(roast: RoastLevel): BeanResearchResult {
   };
 }
 
-/**
- * Ask the platform LLM to research a bean and return structured classification.
- * Uses the platform's fetch capability (network.fetch permission declared in manifest).
- *
- * In production this would call a TAP-hosted LLM capability port.
- * For the demo we call a simple structured-output endpoint.
- */
 export async function researchBean(
   req: ResearchRequest,
   fallbackRoast: RoastLevel = 'medium',
@@ -51,39 +150,23 @@ Do NOT invent URLs or citations — you cannot browse the web, so any link would
 If you are unsure of a field, make your best expert estimate from the roaster and name.
 Respond ONLY with valid JSON, no markdown fences.`;
 
+  const data = await chatCompletion({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+    max_tokens: 500,
+    response_format: { type: 'json_object' },
+  });
+
+  const content = firstChoiceContent(data);
+  if (!content) return fallbackResearch(fallbackRoast);
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // In a real TAP deployment, the API key would come from a host capability / secret port
-        // For demo: the app will use a user-provided key from settings, or fall back gracefully
-        Authorization: `Bearer ${getApiKey()}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 500,
-        response_format: { type: 'json_object' },
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-      console.warn('[Dialed] Research API error:', response.status);
-      return fallbackResearch(fallbackRoast);
-    }
-
-    const data = await response.json() as {
-      choices: Array<{ message: { content: string } }>;
-    };
-    const content = data.choices[0]?.message?.content;
-    if (!content) return fallbackResearch(fallbackRoast);
-
     const parsed = JSON.parse(content) as Partial<BeanResearchResult>;
     return {
-      roast: (['light', 'medium', 'dark'].includes(parsed.roast ?? '') ? parsed.roast : fallbackRoast) as RoastLevel,
+      roast: (['light', 'medium', 'dark'].includes(parsed.roast ?? '')
+        ? parsed.roast
+        : fallbackRoast) as RoastLevel,
       origin: parsed.origin ?? 'Unknown',
       process: parsed.process ?? 'washed',
       tastingNotes: Array.isArray(parsed.tastingNotes) ? parsed.tastingNotes : [],
@@ -92,8 +175,7 @@ Respond ONLY with valid JSON, no markdown fences.`;
       sourceCitations: [],
       description: parsed.description ?? '',
     };
-  } catch (err) {
-    console.warn('[Dialed] Research failed, using fallback:', err);
+  } catch {
     return fallbackResearch(fallbackRoast);
   }
 }
@@ -109,47 +191,46 @@ export async function classifyTasteText(
 Note: "${text}"
 Respond with only the single word.`;
 
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${getApiKey()}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0,
-        max_tokens: 10,
-      }),
-      signal: AbortSignal.timeout(8000),
-    });
+  const data = await chatCompletion({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0,
+    max_tokens: 10,
+  });
 
-    if (!response.ok) return null;
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-    const word = data.choices[0]?.message?.content?.trim().toLowerCase();
-    const valid = ['sour', 'bitter', 'weak', 'strong', 'just-right'] as const;
-    return valid.includes(word as typeof valid[number]) ? (word as typeof valid[number]) : null;
-  } catch {
-    return null;
-  }
+  const word = firstChoiceContent(data)?.trim().toLowerCase();
+  const valid = ['sour', 'bitter', 'weak', 'strong', 'just-right'] as const;
+  return valid.includes(word as (typeof valid)[number])
+    ? (word as (typeof valid)[number])
+    : null;
 }
 
-function getApiKey(): string {
-  // Runtime key only. We never inline the key at build time — a mini app is
-  // client-side code, so a bundled key would be public. The user provides their
-  // key in the Settings screen; it lives in this browser's localStorage.
+// ---------------------------------------------------------------------------
+// Runtime key (fallback transport) — used by the Settings screen
+// ---------------------------------------------------------------------------
+
+function getLocalKey(): string {
   try {
-    return localStorage.getItem('dialed:openai-key') ?? '';
+    return localStorage.getItem(LOCAL_KEY) ?? '';
   } catch {
     return '';
   }
 }
 
 export function setApiKey(key: string): void {
-  localStorage.setItem('dialed:openai-key', key);
+  localStorage.setItem(LOCAL_KEY, key);
 }
 
-export function hasApiKey(): boolean {
-  return Boolean(getApiKey());
+/** True if a runtime key is stored. (The host-credential path is separate.) */
+export function hasLocalKey(): boolean {
+  return Boolean(getLocalKey());
+}
+
+/**
+ * Whether research can run at all: either a host-managed credential is
+ * available (preferred) or a runtime key is stored (fallback).
+ */
+export async function canResearch(): Promise<boolean> {
+  if (sdk?.http?.request && (await getCredentialRef())) return true;
+  return hasLocalKey();
 }

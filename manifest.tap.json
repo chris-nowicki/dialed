@@ -31,7 +31,15 @@
             },
             {
               "id": "network.fetch",
-              "reason": "Research bean information via LLM web lookup"
+              "reason": "Call the LLM research API to classify a bean"
+            },
+            {
+              "id": "credentials.read",
+              "reason": "Discover the host-managed OpenAI credential reference"
+            },
+            {
+              "id": "credentials.use",
+              "reason": "Use the host-managed OpenAI credential without the secret entering app code"
             }
           ]
         }

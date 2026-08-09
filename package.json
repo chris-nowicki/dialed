@@ -22,6 +22,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@module-federation/rsbuild-plugin": "^2.8.2",
     "@rsbuild/core": "^2.1.0",
     "@rsbuild/plugin-react": "^2.1.0",
     "@types/node": "^26.2.0",
