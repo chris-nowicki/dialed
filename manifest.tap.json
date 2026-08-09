@@ -1,0 +1,41 @@
+{
+  "descriptorVersion": 1,
+  "package": {
+    "id": "dialed",
+    "name": "Dialed",
+    "version": "0.1.0",
+    "description": "Coffee dial-in coach for Fellow Aiden + Opus V1 grinder",
+    "author": "Chris Nowicki"
+  },
+  "contributions": [
+    {
+      "id": "dialed-ui",
+      "type": "ui.surface",
+      "name": "Dialed",
+      "description": "Dial in your coffee and get step-by-step brew instructions",
+      "targets": ["desktop", "mobile"],
+      "module": "./src/surface.tsx",
+      "exposes": {
+        "mount": "mount",
+        "unmount": "unmount"
+      },
+      "compatibility": {
+        "minHostVersion": "1.0.0"
+      },
+      "authorization": {
+        "permission": {
+          "catalog": [
+            {
+              "id": "storage.local",
+              "reason": "Persist bean recipes and dial-in sessions locally"
+            },
+            {
+              "id": "network.fetch",
+              "reason": "Research bean information via LLM web lookup"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
