@@ -14,17 +14,30 @@ pnpm build        # must succeed — this is the release artifact
 ```
 Confirm storage is **user-scoped** and 1–2 **sample beans are seeded** so a cold open looks alive.
 
-## Phase B — Connect Zephyr Cloud *(interactive, one-time)*
+## Phase B — Wire in Zephyr Cloud *(one-time)*
 
-1. Create / log into a **Zephyr Cloud** account — https://docs.zephyr-cloud.io/
-2. The **first authenticated `pnpm build`** triggers a browser login and creates your **application record** in Zephyr Cloud.
+Deploy is handled by the Zephyr Rsbuild plugin — it hooks into `pnpm build`.
 
-## Phase C — First publish
+1. Install the [Zephyr Chrome extension](https://docs.zephyr-cloud.io/) (auth prereq).
+2. Add the plugin:
+   ```bash
+   pnpm add -D zephyr-rsbuild-plugin
+   ```
+3. Wire it into `rsbuild.config.ts`:
+   ```ts
+   import { withZephyr } from 'zephyr-rsbuild-plugin';
+   // plugins: [pluginReact(), withZephyr()],
+   ```
+   Module Federation is auto-detected; no extra config.
+
+> ⚠️ Once `withZephyr()` is in the config, `pnpm build` is **no longer a local-only build** — it authenticates and deploys. Your next build *is* your first deploy.
+
+## Phase C — First publish *(interactive auth on first run)*
 
 ```bash
-pnpm build        # authenticated → immutable, versioned release
+pnpm build        # 1st run: browser pops up → sign up / log into Zephyr
 ```
-This pushes the release to your **`development`** environment (which follows the moving `dev` tag and auto-advances on every build).
+Creds cache in `~/.zephyr`. This creates your **application record** and pushes an immutable release to the **`development`** environment (follows the moving `dev` tag, auto-advances each build). Note the org / project / application ID / version shown in the Zephyr UI.
 
 ## Phase D — Environments (Zephyr Cloud UI)
 

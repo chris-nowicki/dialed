@@ -22,11 +22,13 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@module-federation/rsbuild-plugin": "^2.8.2",
     "@rsbuild/core": "^2.1.0",
     "@rsbuild/plugin-react": "^2.1.0",
     "@types/node": "^26.2.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "zephyr-rsbuild-plugin": "^1.2.1"
   }
 }
