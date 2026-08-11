@@ -15,6 +15,7 @@ import {
 import { BrewTemperatureSchedule } from "../components/BrewTemperatureSchedule";
 import { GrindDial } from "../components/GrindDial";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { StickyActionBar } from "../components/StickyActionBar";
 
 interface Props {
   sessionId: string;
@@ -73,7 +74,7 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
       : null;
 
   return (
-    <div className={`screen adjustment-screen ${justRight ? "is-success" : ""}`}>
+    <div className={`screen adjustment-screen has-sticky-action ${justRight ? "is-success" : ""}`}>
       <ScreenHeader
         title={justRight ? "Sweet spot found" : "Your next move"}
         context={`${bean.name} · Brew #${session.events.findIndex((item) => item.id === eventId) + 1}`}
@@ -117,22 +118,25 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
             </div>
           )}
           <GrindDial micron={recipe.grindMicron} size={140} />
-          <div className="recipe-grid adj-grid">
-            <div className="recipe-stat">
-              <span className="stat-label">Ratio</span>
-              <span className="stat-value">1:{currentRatio}</span>
+          <details className="adjustment-recipe-details">
+            <summary>Full recipe</summary>
+            <div className="recipe-grid adj-grid">
+              <div className="recipe-stat">
+                <span className="stat-label">Ratio</span>
+                <span className="stat-value">1:{currentRatio}</span>
+              </div>
+              <div className="recipe-stat">
+                <span className="stat-label">Dose</span>
+                <span className="stat-value">{computeDose(recipe.cups, currentRatio)} g</span>
+              </div>
             </div>
-            <div className="recipe-stat">
-              <span className="stat-label">Dose</span>
-              <span className="stat-value">{computeDose(recipe.cups, currentRatio)} g</span>
-            </div>
-          </div>
-          <BrewTemperatureSchedule
-            basket={definition.basket}
-            bloomTempF={aidenProfile.bloom.tempF}
-            pulseTempsF={pulseTemps}
-            tempUnit={tempUnit}
-          />
+            <BrewTemperatureSchedule
+              basket={definition.basket}
+              bloomTempF={aidenProfile.bloom.tempF}
+              pulseTempsF={pulseTemps}
+              tempUnit={tempUnit}
+            />
+          </details>
         </div>
       )}
 
@@ -162,29 +166,31 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
         </button>
       )}
 
-      {justRight ? (
-        <>
-          <button
-            className="cta-btn"
-            onClick={() => { markDialedIn(recipe.id); goToBean(); }}
-          >
-            ✓ Mark as dialed in
-          </button>
-          <button className="secondary-btn" onClick={goToBean}>Keep tuning</button>
-        </>
-      ) : (
-        <>
-          <button
-            className="cta-btn"
-            onClick={brewAgain}
-          >
-            Brew again now →
-          </button>
-          <button className="secondary-btn" onClick={goToBean}>
-            Done for now — I’ll brew later
-          </button>
-        </>
-      )}
+      <StickyActionBar className="sticky-action-bar-stacked">
+        {justRight ? (
+          <>
+            <button
+              className="cta-btn"
+              onClick={() => { markDialedIn(recipe.id); goToBean(); }}
+            >
+              ✓ Mark as dialed in
+            </button>
+            <button className="secondary-btn" onClick={goToBean}>Keep tuning</button>
+          </>
+        ) : (
+          <>
+            <button
+              className="cta-btn"
+              onClick={brewAgain}
+            >
+              Brew again now →
+            </button>
+            <button className="secondary-btn" onClick={goToBean}>
+              Done for now — I’ll brew later
+            </button>
+          </>
+        )}
+      </StickyActionBar>
     </div>
   );
 }

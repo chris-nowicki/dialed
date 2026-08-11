@@ -106,11 +106,6 @@ export function AppSettingsScreen() {
           </span>
         </div>
 
-        <p className="settings-copy">
-          Dialed uses the platform credential first. If that route is unavailable, this key keeps
-          live bean research working in your browser.
-        </p>
-
         {keyStored && (
           <div className="stored-key-row">
             <span className="stored-key-mask" aria-label="A local API key is stored">
@@ -156,13 +151,23 @@ export function AppSettingsScreen() {
           </p>
         )}
 
-        <div className="key-caution">
-          <span aria-hidden="true">⌁</span>
-          <p>
-            Demo-only: this key is stored in this browser and can be read by this site. Use a scoped
-            key, then rotate it after the event. A new Zephyr URL may need the key entered again.
-          </p>
-        </div>
+        <details className="settings-disclosure">
+          <summary>How the backup key works</summary>
+          <div className="settings-disclosure-body">
+            <p className="settings-copy">
+              Dialed uses the platform credential first. If that route is unavailable, this key
+              keeps live bean research working in your browser.
+            </p>
+            <div className="key-caution">
+              <span aria-hidden="true">⌁</span>
+              <p>
+                Demo-only: this key is stored in this browser and can be read by this site. Use a
+                scoped key, then rotate it after the event. A new Zephyr URL may need the key
+                entered again.
+              </p>
+            </div>
+          </div>
+        </details>
       </section>
     </div>
   );

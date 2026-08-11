@@ -1,8 +1,11 @@
+import type { ReactNode } from "react";
+
 interface ScreenHeaderProps {
   title: string;
   onBack: () => void;
   backLabel?: string;
   context?: string;
+  action?: ReactNode;
 }
 
 export function ScreenHeader({
@@ -10,6 +13,7 @@ export function ScreenHeader({
   onBack,
   backLabel = "Go back",
   context,
+  action,
 }: ScreenHeaderProps) {
   return (
     <header className="screen-header">
@@ -28,6 +32,7 @@ export function ScreenHeader({
         <h1>{title}</h1>
         {context && <p>{context}</p>}
       </div>
+      {action && <div className="screen-header-action">{action}</div>}
     </header>
   );
 }
