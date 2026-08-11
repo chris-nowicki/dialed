@@ -1,6 +1,18 @@
 import { useApp } from "../AppContext";
-import { getAidenProfileForBean, getSession, getRecipe, getBean, markDialedIn } from "../storage";
-import { formatTemp } from "../grindEngine";
+import {
+  getAidenProfileForBean,
+  getBean,
+  getPulseTemperatures,
+  getRecipe,
+  getSession,
+  markDialedIn,
+} from "../storage";
+import {
+  BREW_VARIANTS,
+  computeDose,
+  formatGrindFromMicron,
+  formatTemp,
+} from "../grindEngine";
 import { GrindDial } from "../components/GrindDial";
 import { ScreenHeader } from "../components/ScreenHeader";
 
@@ -16,13 +28,19 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
   const bean = recipe ? getBean(recipe.beanId) : undefined;
   const aidenProfile = recipe ? getAidenProfileForBean(recipe.beanId) : undefined;
 
-  if (!session || !recipe || !bean) return <div className="screen"><p>Session not found.</p></div>;
+  if (!session || !recipe || !bean || !aidenProfile) {
+    return <div className="screen"><p>Session not found.</p></div>;
+  }
 
   const event = session.events.find((e) => e.id === eventId);
   if (!event) return <div className="screen"><p>Event not found.</p></div>;
 
-  const batchTemp = aidenProfile?.batch.pulseTempsF[0] ?? recipe.batch.pulseTempsF[0] ?? 200;
-  const currentRatio = aidenProfile?.ratio ?? recipe.ratio;
+  const definition = BREW_VARIANTS[recipe.brewVariant];
+  const pulseTemps = getPulseTemperatures(aidenProfile, recipe.brewVariant);
+  const currentRatio = aidenProfile.ratio;
+  const temperatureSummary = definition.basket === "single"
+    ? `B ${formatTemp(aidenProfile.bloom.tempF, tempUnit)} · P ${pulseTemps.map((temperature) => formatTemp(temperature, tempUnit)).join("/")}`
+    : formatTemp(pulseTemps[0] ?? 200, tempUnit);
   const justRight = event.tasteResult === "just-right";
   const tasteEmojis: Record<string, string> = {
     sour: '😬', bitter: '😤', weak: '💧', strong: '💪', 'just-right': '✨',
@@ -43,25 +61,19 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
     navigate({ id: "guided-brew", recipeId: recipe!.id, mode: "rate" });
   }
 
-  const changedSetting = event.grindMicron !== recipe.grindMicron
+  const changedSetting = event.settings.grindMicron !== recipe.grindMicron
     ? {
         label: "Grind",
-        before: `Opus ${event.grindDisplay}`,
-        after: `Opus ${recipe.grindDisplay}`,
+        before: `Opus ${formatGrindFromMicron(event.settings.grindMicron).dial}`,
+        after: `Opus ${formatGrindFromMicron(recipe.grindMicron).dial}`,
       }
-    : event.ratio !== currentRatio
+    : event.settings.ratio !== currentRatio
       ? {
           label: "Ratio",
-          before: `1:${event.ratio}`,
+          before: `1:${event.settings.ratio}`,
           after: `1:${currentRatio}`,
         }
-      : event.tempF !== batchTemp
-        ? {
-            label: "Temperature",
-            before: formatTemp(event.tempF, tempUnit),
-            after: formatTemp(batchTemp, tempUnit),
-          }
-        : null;
+      : null;
 
   return (
     <div className={`screen adjustment-screen ${justRight ? "is-success" : ""}`}>
@@ -111,7 +123,7 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
           <div className="recipe-grid adj-grid">
             <div className="recipe-stat">
               <span className="stat-label">Temp</span>
-              <span className="stat-value">{formatTemp(batchTemp, tempUnit)}</span>
+              <span className="stat-value">{temperatureSummary}</span>
             </div>
             <div className="recipe-stat">
               <span className="stat-label">Ratio</span>
@@ -119,7 +131,7 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
             </div>
             <div className="recipe-stat">
               <span className="stat-label">Dose</span>
-              <span className="stat-value">{recipe.dose} g</span>
+              <span className="stat-value">{computeDose(recipe.cups, currentRatio)} g</span>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useApp } from '../AppContext';
+import { useState } from "react";
+import { useApp } from "../AppContext";
 import {
   getRecipe,
   getBean,
@@ -7,15 +7,16 @@ import {
   updateRecipe,
   getActiveSessionForRecipe,
   createSession,
-} from '../storage';
-import { computeDose, cupsToOz, formatTemp, BASKET_CUPS } from '../grindEngine';
-import { GrindDial } from './GrindDial';
+  getPulseTemperatures,
+} from "../storage";
+import { BREW_VARIANTS, computeDose, cupsToOz, formatTemp } from "../grindEngine";
+import { GrindDial } from "./GrindDial";
 import { ScreenHeader } from "./ScreenHeader";
 
 interface Props {
   recipeId: string;
   /** 'rate' hands off to the taste loop at the end; 'brew' just finishes. */
-  mode: 'rate' | 'brew';
+  mode: "rate" | "brew";
 }
 
 /**
@@ -29,7 +30,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
   const aidenProfile = recipe ? getAidenProfileForBean(recipe.beanId) : undefined;
 
   const [cups, setCups] = useState<number>(
-    () => recipe?.cups ?? BASKET_CUPS[recipe?.brewSize ?? 'batch'].default,
+    () => recipe?.cups ?? BREW_VARIANTS["large-batch"].cups.default,
   );
   const [step, setStep] = useState(0);
 
@@ -60,15 +61,19 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
     );
   }
 
-  const range = BASKET_CUPS[recipe.brewSize];
-  const temp = aidenProfile.batch.pulseTempsF[0] ?? 200;
+  const definition = BREW_VARIANTS[recipe.brewVariant];
+  const range = definition.cups;
+  const pulseTemps = getPulseTemperatures(aidenProfile, recipe.brewVariant);
+  const temperatureSummary = definition.basket === "single"
+    ? `Bloom ${formatTemp(aidenProfile.bloom.tempF, tempUnit)} · Pulses ${pulseTemps.map((temperature) => formatTemp(temperature, tempUnit)).join(" / ")}`
+    : `Bloom ${formatTemp(aidenProfile.bloom.tempF, tempUnit)} · Brew ${formatTemp(pulseTemps[0] ?? 200, tempUnit)}`;
   const profileRatio = aidenProfile.ratio;
   const dose = computeDose(cups, profileRatio);
 
   function changeCups(next: number) {
     const clamped = Math.min(range.max, Math.max(range.min, parseFloat(next.toFixed(2))));
     setCups(clamped);
-    updateRecipe(recipeId, { cups: clamped, dose: computeDose(clamped, profileRatio) });
+    updateRecipe(recipeId, { cups: clamped });
   }
 
   const steps: { label: string; title: string; body: React.ReactNode; hint?: string }[] = [
@@ -79,6 +84,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
         <div className="gb-profile">
           <span className="gb-crumb">Guided Brew › Pick Profile</span>
           <span className="gb-profile-name">{aidenProfile.name}</span>
+          <span className="gb-profile-temps">{temperatureSummary}</span>
         </div>
       ),
       hint: 'On the Aiden, choose Guided Brew, then select this profile.',
@@ -170,7 +176,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
     <div className="screen gb-screen">
       <ScreenHeader
         title="Guided brew"
-        context={`${bean.name} · ${recipe.brewSize === "single" ? "Single" : "Batch"}`}
+        context={`${bean.name} · ${definition.label}`}
         onBack={back}
       />
 
@@ -193,7 +199,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
         <div className="gb-content">{current.body}</div>
         {current.hint && <p className="gb-hint">{current.hint}</p>}
         {(step === 2 || step === 3) && (
-          <p className="gb-context">1:{profileRatio} · {formatTemp(temp, tempUnit)} · {cups} cups</p>
+          <p className="gb-context">1:{profileRatio} · {temperatureSummary} · {cups} cups</p>
         )}
       </div>
 

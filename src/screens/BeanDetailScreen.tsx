@@ -1,59 +1,69 @@
-import { useState } from 'react';
-import { useApp } from '../AppContext';
+import { useState } from "react";
+import { useApp } from "../AppContext";
 import {
   getBean,
   getAidenProfileForBean,
   updateBean,
-  getRecipeForBeanSize,
+  getPulseTemperatures,
+  getRecipeForBeanVariant,
   getActiveSessionForRecipe,
   createStartingRecipe,
   markDialedIn,
   reopenRecipe,
   deleteBean,
-} from '../storage';
-import { formatTemp, BASKET_CUPS } from '../grindEngine';
-import { GrindDial } from '../components/GrindDial';
-import type { BrewSize, RoastLevel } from '../types';
+} from "../storage";
+import {
+  BREW_VARIANT_ORDER,
+  BREW_VARIANTS,
+  computeDose,
+  formatTemp,
+} from "../grindEngine";
+import { GrindDial } from "../components/GrindDial";
+import type { BrewVariant, RoastLevel } from "../types";
 import { ScreenHeader } from "../components/ScreenHeader";
 
 interface Props {
   beanId: string;
 }
 
-const BASKETS: { size: BrewSize; label: string; sub: string }[] = [
-  { size: 'single', label: 'Single', sub: 'Cone · 1–3 cups' },
-  { size: 'batch', label: 'Batch', sub: 'Flat · 4–10 cups' },
-];
-
 export function BeanDetailScreen({ beanId }: Props) {
-  const { navigate } = useApp();
+  const { navigate, tempUnit } = useApp();
   const bean = getBean(beanId);
 
-  // Default to the basket that already has a recipe (prefer batch).
-  const initialBasket: BrewSize = getRecipeForBeanSize(beanId, 'batch')
-    ? 'batch'
-    : getRecipeForBeanSize(beanId, 'single')
-      ? 'single'
-      : 'batch';
+  // Prefer the large-batch target because it is the seeded default.
+  const initialVariant: BrewVariant = getRecipeForBeanVariant(beanId, "large-batch")
+    ? "large-batch"
+    : getRecipeForBeanVariant(beanId, "small-batch")
+      ? "small-batch"
+      : getRecipeForBeanVariant(beanId, "single")
+        ? "single"
+        : "large-batch";
 
-  const [basket, setBasket] = useState<BrewSize>(initialBasket);
+  const [brewVariant, setBrewVariant] = useState<BrewVariant>(initialVariant);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [, setRefresh] = useState(0);
   const bump = () => setRefresh((r) => r + 1);
 
   if (!bean) return <div className="screen"><p>Bean not found.</p></div>;
 
-  const recipe = getRecipeForBeanSize(beanId, basket);
+  const recipe = getRecipeForBeanVariant(beanId, brewVariant);
   const aidenProfile = getAidenProfileForBean(beanId);
   const session = recipe ? getActiveSessionForRecipe(recipe.id) : undefined;
   const lastEvent = session?.events[session.events.length - 1];
-  const suggestDialed = lastEvent?.tasteResult === 'just-right';
-  const temp = aidenProfile?.batch.pulseTempsF[0]
-    ?? (recipe ? recipe.batch.pulseTempsF[0] ?? 200 : 0);
-  const ratio = aidenProfile?.ratio ?? recipe?.ratio;
+  const suggestDialed = lastEvent?.tasteResult === "just-right";
+  const pulseTemps = aidenProfile
+    ? getPulseTemperatures(aidenProfile, brewVariant)
+    : [];
+  const tempSummary = aidenProfile
+    ? BREW_VARIANTS[brewVariant].basket === "single"
+      ? `B ${formatTemp(aidenProfile.bloom.tempF, tempUnit)} · P ${pulseTemps.map((temperature) => formatTemp(temperature, tempUnit)).join("/")}`
+      : formatTemp(pulseTemps[0] ?? 200, tempUnit)
+    : "—";
+  const ratio = aidenProfile?.ratio;
+  const dose = recipe && ratio ? computeDose(recipe.cups, ratio) : undefined;
 
   function startDialing() {
-    const created = createStartingRecipe(bean!, basket);
+    const created = createStartingRecipe(bean!, brewVariant);
     startGuidedBrew(created.id, "rate");
   }
 
@@ -86,7 +96,13 @@ export function BeanDetailScreen({ beanId }: Props) {
             <h2 className="bd-name">{bean.name}</h2>
           </div>
           <span className={`bd-overall-status ${recipe?.status === "dialed-in" ? "dialed" : ""}`}>
-            {recipe?.status === "dialed-in" ? "Dialed in" : recipe ? "In progress" : "Fresh bag"}
+            {recipe?.status === "dialed-in"
+              ? "Dialed in"
+              : recipe?.status === "needs-recheck"
+                ? "Check again"
+                : recipe
+                  ? "In progress"
+                  : "Fresh bag"}
           </span>
         </div>
         {bean.tastingNotes.length > 0 && (
@@ -169,21 +185,34 @@ export function BeanDetailScreen({ beanId }: Props) {
         </div>
       </section>
 
-      {/* Basket selector */}
+      {/* Brew variant selector */}
       <div className="bd-baskets">
-        {BASKETS.map(({ size, label, sub }) => {
-          const r = getRecipeForBeanSize(beanId, size);
-          const state = !r ? 'none' : r.status === 'dialed-in' ? 'dialed' : 'dialing';
+        {BREW_VARIANT_ORDER.map((variant) => {
+          const definition = BREW_VARIANTS[variant];
+          const variantRecipe = getRecipeForBeanVariant(beanId, variant);
+          const state = !variantRecipe
+            ? "none"
+            : variantRecipe.status === "dialed-in"
+              ? "dialed"
+              : variantRecipe.status === "needs-recheck"
+                ? "recheck"
+                : "dialing";
           return (
             <button
-              key={size}
-              className={`bd-basket ${basket === size ? 'active' : ''}`}
-              onClick={() => setBasket(size)}
+              key={variant}
+              className={`bd-basket ${brewVariant === variant ? "active" : ""}`}
+              onClick={() => setBrewVariant(variant)}
             >
-              <span className="bd-basket-label">{label}</span>
-              <span className="bd-basket-sub">{sub}</span>
+              <span className="bd-basket-label">{definition.label}</span>
+              <span className="bd-basket-sub">{definition.description}</span>
               <span className={`chip chip-${state}`}>
-                {state === 'none' ? 'Not started' : state === 'dialed' ? 'Dialed in' : 'Dialing'}
+                {state === "none"
+                  ? "Not started"
+                  : state === "dialed"
+                    ? "Dialed in"
+                    : state === "recheck"
+                      ? "Check again"
+                      : "Dialing"}
               </span>
             </button>
           );
@@ -200,7 +229,12 @@ export function BeanDetailScreen({ beanId }: Props) {
               </div>
               <button
                 className="bd-edit"
-                onClick={() => navigate({ id: 'edit-settings', beanId, brewSize: basket, recipeId: recipe.id })}
+                onClick={() => navigate({
+                  id: "edit-settings",
+                  beanId,
+                  brewVariant,
+                  recipeId: recipe.id,
+                })}
               >
                 Edit
               </button>
@@ -210,11 +244,11 @@ export function BeanDetailScreen({ beanId }: Props) {
             <div className="bd-metrics">
               <div className="recipe-stat">
                 <span className="stat-label">Dose</span>
-                <span className="stat-value">{recipe.dose} g</span>
+                <span className="stat-value">{dose} g</span>
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Cups</span>
-                <span className="stat-value">{recipe.cups ?? BASKET_CUPS[basket].default}</span>
+                <span className="stat-value">{recipe.cups}</span>
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Ratio</span>
@@ -222,12 +256,12 @@ export function BeanDetailScreen({ beanId }: Props) {
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Temp</span>
-                <span className="stat-value">{formatTemp(temp, 'F')}</span>
+                <span className="stat-value bd-temp-sequence">{tempSummary}</span>
               </div>
             </div>
           </div>
 
-          {recipe.status === 'dialed-in' ? (
+          {recipe.status === "dialed-in" ? (
             <>
               <button className="cta-btn" onClick={() => startGuidedBrew(recipe.id, "brew")}>
                 Brew it ☕
@@ -242,7 +276,7 @@ export function BeanDetailScreen({ beanId }: Props) {
           ) : (
             <>
               <button className="cta-btn" onClick={() => startGuidedBrew(recipe.id, "rate")}>
-                Brew &amp; rate →
+                {recipe.status === "needs-recheck" ? "Check brew & rate →" : "Brew & rate →"}
               </button>
               <button
                 className={`mark-dialed ${suggestDialed ? 'glow' : ''}`}
@@ -260,11 +294,13 @@ export function BeanDetailScreen({ beanId }: Props) {
         </>
       ) : (
         <div className="card bd-empty-basket">
-          <p>You haven’t dialed in the <strong>{basket === 'single' ? 'single (cone)' : 'batch (flat)'}</strong> basket yet.</p>
+          <p>
+            You haven’t dialed in <strong>{BREW_VARIANTS[brewVariant].label.toLowerCase()}</strong> yet.
+          </p>
           <button className="cta-btn bd-inline-cta" onClick={startDialing}>Start dialing →</button>
           <button
             className="text-btn bd-center"
-            onClick={() => navigate({ id: 'edit-settings', beanId, brewSize: basket })}
+            onClick={() => navigate({ id: "edit-settings", beanId, brewVariant })}
           >
             Set my own starting point
           </button>

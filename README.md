@@ -13,7 +13,7 @@ Dialing in a new bag of coffee is guesswork. You brew, it's sour, you grind fine
 ## How it works
 
 ### 1. 🔍 Research the bean
-Type the roaster and bean. Dialed researches roast level, origin, and process, then derives a **starting recipe** — grind, temperature, ratio, bloom — with the numbers set for *your* gear.
+Type the roaster and bean. Dialed researches roast level, origin, and process, then derives a **starting recipe** — grind, temperature, ratio, bloom — with the numbers set for *your* gear. Single serve, small batch, and large batch each keep an independent grind history.
 
 ### 2. 🎯 Dial In (the coach)
 Brew it, taste it, tap how it landed:
@@ -21,11 +21,13 @@ Brew it, taste it, tap how it landed:
 | You taste… | Dialed knows… | It changes… |
 |---|---|---|
 | **Sour / sharp** | under-extracted | grind **finer** |
-| **Bitter / harsh** | over-extracted | grind **coarser** (or cooler) |
+| **Bitter / harsh** | over-extracted | grind **coarser** |
 | **Weak / watery** | under-strength | more coffee (tighten ratio) |
 | **Strong / muddy** | over-strength | less coffee (loosen ratio) |
 
-It changes **one variable at a time** (grind → temp → ratio), and once you've crossed from sour to bitter it **brackets** — narrowing in on the sweet spot like a binary search, with a live visualization of the bracket closing. Say **"just right"** and the recipe is saved.
+For the original stepped Fellow Opus, Dialed uses Fellow's Aiden starting points: **6.5** for single serve, **8** for small batch, and **10.5** for large batch. Single serve stores bloom and every pulse temperature separately; both batch sizes share the Aiden profile's batch temperature while retaining independent grind targets.
+
+It changes **one variable at a time**—grind for extraction, ratio for strength—and once you've crossed from sour to bitter it **brackets** the grind, narrowing in on the sweet spot like a binary search. Temperature schedules stay under explicit user control because tasting the finished cup cannot reliably identify one pulse to change.
 
 ### 3. 📋 Brew It (the instructions)
 Anyone can pick a dialed-in bean and follow a kitchen-friendly, one-step-at-a-time checklist: select the Aiden profile, set the grinder, weigh, brew. No decisions, no guesswork.
@@ -99,7 +101,7 @@ PRD.md                  # product requirements & design decisions
 
 ## Roadmap
 
-Single-serve mode with per-pour temperatures · photo-of-bag OCR input · more brew methods (Chemex, V60) and grinders · a shared, searchable community recipe database · possibly a standalone consumer app.
+Photo-of-bag OCR input · more brew methods (Chemex, V60) and grinders · a shared, searchable community recipe database · possibly a standalone consumer app.
 
 ---
 

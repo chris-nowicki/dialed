@@ -13,6 +13,7 @@
     "preinstall": "npx only-allow pnpm",
     "dev": "rsbuild dev",
     "build": "rsbuild build",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "preview": "rsbuild preview"
   },
@@ -29,6 +30,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.5.0",
+    "vitest": "^4.0.0",
     "zephyr-rsbuild-plugin": "^1.2.1"
   }
 }
