@@ -62,12 +62,49 @@ html, body, #root {
   gap: 10px;
 }
 
-.app-logo { font-size: 28px; }
+.app-logo {
+  align-items: center;
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.app-logo svg {
+  height: 38px;
+  overflow: visible;
+  width: 38px;
+}
+
+.logo-bean {
+  fill: #211a15;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+}
+
+.logo-seam {
+  fill: none;
+  opacity: 0.62;
+  stroke: var(--accent-hover);
+  stroke-linecap: round;
+  stroke-width: 1.25;
+}
+
+.logo-needle {
+  fill: none;
+  stroke: var(--text);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.logo-hub {
+  fill: var(--accent-hover);
+}
 
 .app-title {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
+  font-size: 29px;
+  font-weight: 750;
+  letter-spacing: -1px;
   flex: 1;
 }
 
@@ -1369,8 +1406,8 @@ a:focus-visible {
 }
 
 .app-title {
-  font-family: var(--font-display);
-  font-size: 32px;
+  font-family: var(--font);
+  font-size: 31px;
 }
 
 .home-hero {
@@ -1483,7 +1520,7 @@ a:focus-visible {
   color: var(--text-dim);
   display: flex;
   font-size: 10px;
-  gap: 14px;
+  gap: 0;
   grid-column: 1 / -1;
   margin-top: 17px;
   padding-top: 12px;
@@ -1493,8 +1530,8 @@ a:focus-visible {
 
 .home-pulse strong {
   color: var(--text);
-  font-size: 12px;
-  margin-right: 2px;
+  font-size: 14px;
+  margin-right: 4px;
 }
 
 .section-title {

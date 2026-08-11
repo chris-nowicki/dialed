@@ -1,5 +1,5 @@
 import { useApp } from '../AppContext';
-import { getBeans, getRecipes, getRecipeForBeanSize } from "../storage";
+import { getBeans, getRecipeForBeanSize } from "../storage";
 import type { Bean, BrewSize } from '../types';
 
 type BasketState = 'none' | 'dialing' | 'dialed';
@@ -40,14 +40,18 @@ function BeanRow({ bean, onOpen }: { bean: Bean; onOpen: () => void }) {
 export function HomeScreen() {
   const { navigate } = useApp();
   const beans = getBeans();
-  const recipes = getRecipes();
-  const activeRecipes = recipes.filter((recipe) => recipe.status === "starting").length;
-  const dialedRecipes = recipes.filter((recipe) => recipe.status === "dialed-in").length;
 
   return (
     <div className="screen home-screen">
       <header className="app-header">
-        <div className="app-logo">☕</div>
+        <div className="app-logo" aria-hidden="true">
+          <svg viewBox="0 0 40 40">
+            <path className="logo-bean" d="M30.7 7.8c4.7 5.2 3.1 15.5-3.7 22.3S11 38.5 6.9 33.2C2.7 27.8 4.8 17.7 11.4 11 18 4.5 26.1 2.6 30.7 7.8Z" />
+            <path className="logo-seam" d="M29.3 8.9c-7.8 3.8-7.1 10.3-10.1 14.8-2.1 3.2-5.5 5.6-10.7 7.8" />
+            <path className="logo-needle" d="m20 20 8.2-8.2" />
+            <circle className="logo-hub" cx="20" cy="20" r="2.25" />
+          </svg>
+        </div>
         <h1 className="app-title">Dialed</h1>
         <button
           className="settings-button"
@@ -78,9 +82,7 @@ export function HomeScreen() {
         </div>
         {beans.length > 0 && (
           <div className="home-pulse" aria-label="Dial-in summary">
-            <span><strong>{beans.length}</strong> bean{beans.length === 1 ? "" : "s"}</span>
-            <span><strong>{activeRecipes}</strong> dialing</span>
-            <span><strong>{dialedRecipes}</strong> dialed in</span>
+            <span><strong>{beans.length}</strong> bean{beans.length === 1 ? "" : "s"} on your bench</span>
           </div>
         )}
       </section>
