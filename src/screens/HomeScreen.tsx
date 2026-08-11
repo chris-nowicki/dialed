@@ -44,15 +44,7 @@ export function HomeScreen() {
   return (
     <div className="screen home-screen">
       <header className="app-header">
-        <div className="app-logo" aria-hidden="true">
-          <svg viewBox="0 0 40 40">
-            <path className="logo-bean" d="M30.7 7.8c4.7 5.2 3.1 15.5-3.7 22.3S11 38.5 6.9 33.2C2.7 27.8 4.8 17.7 11.4 11 18 4.5 26.1 2.6 30.7 7.8Z" />
-            <path className="logo-seam" d="M29.3 8.9c-7.8 3.8-7.1 10.3-10.1 14.8-2.1 3.2-5.5 5.6-10.7 7.8" />
-            <path className="logo-needle" d="m20 20 8.2-8.2" />
-            <circle className="logo-hub" cx="20" cy="20" r="2.25" />
-          </svg>
-        </div>
-        <h1 className="app-title">Dialed</h1>
+        <h1 className="app-title">Dialed<span>.</span></h1>
         <button
           className="settings-button"
           onClick={() => navigate({ id: "app-settings" })}
@@ -74,11 +66,13 @@ export function HomeScreen() {
           <h2 id="home-hero-title">Find the sweet spot.</h2>
           <p>Turn every taste into one confident adjustment for the next brew.</p>
         </div>
-        <div className="home-dial" aria-hidden="true">
-          <span className="home-dial-ring" />
-          <span className="home-dial-pointer" />
-          <span className="home-dial-center" />
-          <span className="home-dial-sweet">sweet</span>
+        <div className="home-spectrum" aria-hidden="true">
+          <div className="home-spectrum-track"><span /></div>
+          <div className="home-spectrum-labels">
+            <span>Sour</span>
+            <strong>Sweet spot</strong>
+            <span>Bitter</span>
+          </div>
         </div>
         {beans.length > 0 && (
           <div className="home-pulse" aria-label="Dial-in summary">
