@@ -16,8 +16,8 @@ import {
   BREW_VARIANT_ORDER,
   BREW_VARIANTS,
   computeDose,
-  formatTemp,
 } from "../grindEngine";
+import { BrewTemperatureSchedule } from "../components/BrewTemperatureSchedule";
 import { GrindDial } from "../components/GrindDial";
 import type { BrewVariant, RoastLevel } from "../types";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -54,11 +54,6 @@ export function BeanDetailScreen({ beanId }: Props) {
   const pulseTemps = aidenProfile
     ? getPulseTemperatures(aidenProfile, brewVariant)
     : [];
-  const tempSummary = aidenProfile
-    ? BREW_VARIANTS[brewVariant].basket === "single"
-      ? `B ${formatTemp(aidenProfile.bloom.tempF, tempUnit)} · P ${pulseTemps.map((temperature) => formatTemp(temperature, tempUnit)).join("/")}`
-      : formatTemp(pulseTemps[0] ?? 200, tempUnit)
-    : "—";
   const ratio = aidenProfile?.ratio;
   const dose = recipe && ratio ? computeDose(recipe.cups, ratio) : undefined;
 
@@ -241,7 +236,7 @@ export function BeanDetailScreen({ beanId }: Props) {
             </div>
             <p className="bd-dial-kicker">Set Opus to</p>
             <GrindDial micron={recipe.grindMicron} size={148} />
-            <div className="bd-metrics">
+            <div className="bd-metrics bd-metrics-primary">
               <div className="recipe-stat">
                 <span className="stat-label">Dose</span>
                 <span className="stat-value">{dose} g</span>
@@ -254,11 +249,15 @@ export function BeanDetailScreen({ beanId }: Props) {
                 <span className="stat-label">Ratio</span>
                 <span className="stat-value">1:{ratio}</span>
               </div>
-              <div className="recipe-stat">
-                <span className="stat-label">Temp</span>
-                <span className="stat-value bd-temp-sequence">{tempSummary}</span>
-              </div>
             </div>
+            {aidenProfile && (
+              <BrewTemperatureSchedule
+                basket={BREW_VARIANTS[brewVariant].basket}
+                bloomTempF={aidenProfile.bloom.tempF}
+                pulseTempsF={pulseTemps}
+                tempUnit={tempUnit}
+              />
+            )}
           </div>
 
           {recipe.status === "dialed-in" ? (

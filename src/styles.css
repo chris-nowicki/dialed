@@ -1220,14 +1220,10 @@ html, body, #root {
   font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
   color: var(--text-dim); align-self: flex-start;
 }
-.bd-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; }
+.bd-metrics { display: grid; gap: 10px; width: 100%; }
+.bd-metrics-primary { grid-template-columns: repeat(3, 1fr); }
 .bd-metrics .recipe-stat { align-items: center; text-align: center; gap: 2px; }
 .bd-metrics .stat-value { font-size: 17px; }
-.bd-metrics .bd-temp-sequence {
-  font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
 
 .mark-dialed {
   display: block; width: calc(100% - 32px); margin: 4px 16px; padding: 14px;
@@ -1283,8 +1279,76 @@ html, body, #root {
 
 .new-settings-card { display: flex; flex-direction: column; align-items: center; }
 .new-settings-card .new-settings-title { align-self: flex-start; }
-.adj-grid { grid-template-columns: repeat(3, 1fr); margin-top: 14px; margin-bottom: 0; }
+.adj-grid {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 14px;
+  margin-top: 14px;
+  width: 100%;
+}
 .adj-grid .recipe-stat { align-items: center; text-align: center; }
+
+.brew-temperature-schedule {
+  background: rgba(13, 11, 10, 0.62);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  width: 100%;
+}
+
+.brew-temperature-title {
+  color: var(--text-dim);
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.7px;
+  margin-bottom: 9px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.brew-temperature-values {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+}
+
+.brew-temperature-value {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+}
+
+.brew-temperature-value span {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.brew-temperature-value strong {
+  color: var(--text);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.progress-link {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.progress-link svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 18px;
+}
 
 /* ── Demo shine pass ─────────────────────────────────────────────────────── */
 
