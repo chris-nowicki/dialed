@@ -1,5 +1,5 @@
 import { useApp } from '../AppContext';
-import { getBeans, getRecipeForBeanSize } from '../storage';
+import { getBeans, getRecipeForBeanSize } from "../storage";
 import type { Bean, BrewSize } from '../types';
 
 type BasketState = 'none' | 'dialing' | 'dialed';
@@ -38,26 +38,47 @@ function BeanRow({ bean, onOpen }: { bean: Bean; onOpen: () => void }) {
 }
 
 export function HomeScreen() {
-  const { navigate, tempUnit, toggleTempUnit } = useApp();
+  const { navigate } = useApp();
   const beans = getBeans();
 
   return (
     <div className="screen home-screen">
       <header className="app-header">
-        <div className="app-logo">☕</div>
-        <h1 className="app-title">Dialed</h1>
+        <h1 className="app-title">Dialed<span>.</span></h1>
         <button
-          className="temp-toggle"
-          onClick={toggleTempUnit}
-          aria-label={`Switch to °${tempUnit === 'F' ? 'C' : 'F'}`}
+          className="settings-button"
+          onClick={() => navigate({ id: "app-settings" })}
+          aria-label="Open settings"
+          title="Settings"
         >
-          °{tempUnit}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h7M15 17h5" />
+            <circle cx="16" cy="7" r="2" />
+            <circle cx="8" cy="12" r="2" />
+            <circle cx="13" cy="17" r="2" />
+          </svg>
         </button>
       </header>
 
+      <section className="home-hero" aria-labelledby="home-hero-title">
+        <div className="home-hero-copy">
+          <p className="home-eyebrow">Your dial-in coach</p>
+          <h2 id="home-hero-title">Find the sweet spot.</h2>
+          <p>Turn every taste into one confident adjustment for the next brew.</p>
+        </div>
+        <div className="home-spectrum" aria-hidden="true">
+          <div className="home-spectrum-track"><span /></div>
+          <div className="home-spectrum-labels">
+            <span>Sour</span>
+            <strong>Sweet spot</strong>
+            <span>Bitter</span>
+          </div>
+        </div>
+      </section>
+
       {beans.length > 0 ? (
         <>
-          <h2 className="section-title">Your beans</h2>
+          <h2 className="section-title">Beans</h2>
           <ul className="bean-list">
             {beans.map((bean) => (
               <BeanRow

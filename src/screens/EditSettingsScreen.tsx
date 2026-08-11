@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { useApp } from '../AppContext';
 import {
   getBean,
+  getAidenProfileForBean,
   getRecipe,
   updateRecipe,
   createRecipeFromSettings,
+  ensureAidenProfile,
+  updateAidenProfileRecipeSettings,
 } from '../storage';
 import {
   OPUS_V1,
@@ -17,6 +20,7 @@ import {
 } from '../grindEngine';
 import { GrindDial } from '../components/GrindDial';
 import type { BrewSize } from '../types';
+import { ScreenHeader } from "../components/ScreenHeader";
 
 interface Props {
   beanId: string;
@@ -47,12 +51,15 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
   const { navigate, goBack, tempUnit } = useApp();
   const bean = getBean(beanId);
   const existing = recipeId ? getRecipe(recipeId) : undefined;
+  const aidenProfile = bean
+    ? getAidenProfileForBean(beanId) ?? ensureAidenProfile(bean)
+    : undefined;
 
   const seed = existing
     ? {
         dial: OPUS_V1.micronToDial(existing.grindMicron),
-        ratio: existing.ratio,
-        tempF: existing.batch.pulseTempsF[0] ?? 200,
+        ratio: aidenProfile?.ratio ?? existing.ratio,
+        tempF: aidenProfile?.batch.pulseTempsF[0] ?? existing.batch.pulseTempsF[0] ?? 200,
         cups: existing.cups ?? BASKET_CUPS[brewSize].default,
       }
     : (() => {
@@ -82,12 +89,10 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
       updateRecipe(existing.id, {
         grindMicron,
         grindDisplay,
-        ratio,
-        batch: { ...existing.batch, pulseTempsF: [tempF] },
-        singleServe: { ...existing.singleServe, pulseTempsF: [tempF] },
         cups,
         dose,
       });
+      updateAidenProfileRecipeSettings(beanId, { ratio, tempF });
     } else {
       createRecipeFromSettings(bean!, brewSize, { grindMicron, grindDisplay, ratio, tempF, cups });
     }
@@ -96,10 +101,11 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
 
   return (
     <div className="screen">
-      <header className="screen-header">
-        <button className="back-btn" onClick={goBack}>← Back</button>
-        <h2>{existing ? 'Edit settings' : 'Set your starting point'}</h2>
-      </header>
+      <ScreenHeader
+        title={existing ? "Edit settings" : "Starting point"}
+        context={`${bean.name} · ${brewSize === "single" ? "Single" : "Batch"}`}
+        onBack={goBack}
+      />
 
       <p className="screen-intro">
         {existing
@@ -155,6 +161,11 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
           <span className="es-value">{dose} g</span>
         </div>
       </div>
+
+      <p className="es-profile-note">
+        Ratio and temperature belong to the shared Aiden profile and apply to both baskets.
+        Changing either will require a quick update in Fellow.
+      </p>
 
       <button className="cta-btn" onClick={save}>
         {existing ? 'Save settings' : 'Save & continue →'}

@@ -61,11 +61,37 @@ export interface PulseBlock {
   pulseTempsF: number[];
 }
 
+export type AidenProfileStatus = "needs-setup" | "ready" | "needs-update";
+
+export interface AidenProfile {
+  id: string;
+  beanId: string;
+  name: string;
+  baseRoast: RoastLevel;
+  ratio: number;
+  coldBrew: boolean;
+  bloom: BloomSettings;
+  singleServe: PulseBlock;
+  batch: PulseBlock;
+  status: AidenProfileStatus;
+  confirmedAt?: string;
+  confirmedSettings?: {
+    ratio: number;
+    coldBrew: boolean;
+    bloom: BloomSettings;
+    singleServe: PulseBlock;
+    batch: PulseBlock;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Recipe {
   id: string;
   beanId: string;
   brewMethodId: string;
   grinderModelId: string;
+  aidenProfileId?: string;
   aidenProfileName: string;
   /** e.g. 16 means 1:16 coffee-to-water */
   ratio: number;
@@ -133,6 +159,8 @@ export interface BeanResearchResult {
 
 export type Screen =
   | { id: 'home' }
+  | { id: "app-settings" }
+  | { id: "aiden-profile"; beanId: string; recipeId?: string; mode?: "rate" | "brew" }
   | { id: 'add-bean' }
   | { id: 'researching'; beanId: string }
   | { id: 'bean-detail'; beanId: string }

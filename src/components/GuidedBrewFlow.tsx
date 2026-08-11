@@ -3,12 +3,14 @@ import { useApp } from '../AppContext';
 import {
   getRecipe,
   getBean,
+  getAidenProfileForBean,
   updateRecipe,
   getActiveSessionForRecipe,
   createSession,
 } from '../storage';
 import { computeDose, cupsToOz, formatTemp, BASKET_CUPS } from '../grindEngine';
 import { GrindDial } from './GrindDial';
+import { ScreenHeader } from "./ScreenHeader";
 
 interface Props {
   recipeId: string;
@@ -24,6 +26,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
   const { navigate, goBack, tempUnit } = useApp();
   const recipe = getRecipe(recipeId);
   const bean = recipe ? getBean(recipe.beanId) : undefined;
+  const aidenProfile = recipe ? getAidenProfileForBean(recipe.beanId) : undefined;
 
   const [cups, setCups] = useState<number>(
     () => recipe?.cups ?? BASKET_CUPS[recipe?.brewSize ?? 'batch'].default,
@@ -32,28 +35,56 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
 
   if (!recipe || !bean) return <div className="screen"><p>Recipe not found.</p></div>;
 
+  if (!aidenProfile || aidenProfile.status !== "ready") {
+    return (
+      <div className="screen gb-screen">
+        <ScreenHeader title="Guided brew" context={bean.name} onBack={goBack} />
+        <div className="card gb-profile-gate">
+          <p className="screen-eyebrow">Aiden profile required</p>
+          <h2>Confirm the profile first.</h2>
+          <p>Guided Brew needs the matching profile saved in Fellow before you continue.</p>
+          <button
+            type="button"
+            className="cta-btn"
+            onClick={() => navigate({
+              id: "aiden-profile",
+              beanId: bean.id,
+              recipeId,
+              mode,
+            })}
+          >
+            Open profile guide
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const range = BASKET_CUPS[recipe.brewSize];
-  const temp = recipe.batch.pulseTempsF[0] ?? 200;
-  const dose = computeDose(cups, recipe.ratio);
+  const temp = aidenProfile.batch.pulseTempsF[0] ?? 200;
+  const profileRatio = aidenProfile.ratio;
+  const dose = computeDose(cups, profileRatio);
 
   function changeCups(next: number) {
     const clamped = Math.min(range.max, Math.max(range.min, parseFloat(next.toFixed(2))));
     setCups(clamped);
-    updateRecipe(recipeId, { cups: clamped, dose: computeDose(clamped, recipe!.ratio) });
+    updateRecipe(recipeId, { cups: clamped, dose: computeDose(clamped, profileRatio) });
   }
 
-  const steps: { title: string; body: React.ReactNode; hint?: string }[] = [
+  const steps: { label: string; title: string; body: React.ReactNode; hint?: string }[] = [
     {
+      label: "Profile",
       title: 'Pick your profile',
       body: (
         <div className="gb-profile">
           <span className="gb-crumb">Guided Brew › Pick Profile</span>
-          <span className="gb-profile-name">{recipe.aidenProfileName}</span>
+          <span className="gb-profile-name">{aidenProfile.name}</span>
         </div>
       ),
       hint: 'On the Aiden, choose Guided Brew, then select this profile.',
     },
     {
+      label: "Cups",
       title: 'How many cups?',
       body: (
         <div className="gb-cups">
@@ -69,11 +100,13 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
       hint: 'Match the cup count you set on the Aiden dial.',
     },
     {
+      label: "Grind",
       title: 'Set the grind',
       body: <GrindDial micron={recipe.grindMicron} size={168} />,
       hint: 'On your Opus grinder.',
     },
     {
+      label: "Dose",
       title: 'Add coffee',
       body: (
         <div className="gb-metric">
@@ -84,13 +117,28 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
       hint: `Weigh out ${dose} g of your grounds — the Aiden shows this same number.`,
     },
     {
+      label: "Water",
       title: 'Top off the water tank',
-      body: <div className="gb-water">💧</div>,
+      body: (
+        <div className="gb-water-visual" aria-hidden="true">
+          <span className="gb-water-drop" />
+          <span className="gb-water-line one" />
+          <span className="gb-water-line two" />
+          <span className="gb-water-line three" />
+        </div>
+      ),
       hint: 'Just keep it full — the Aiden meters the exact water for you.',
     },
     {
+      label: "Brew",
       title: 'Press brew',
-      body: <div className="gb-brew-go">☕</div>,
+      body: (
+        <div className="gb-brew-visual" aria-hidden="true">
+          <span className="gb-steam one" />
+          <span className="gb-steam two" />
+          <span className="gb-cup"><span /></span>
+        </div>
+      ),
       hint: mode === 'rate'
         ? 'Start the brew on the Aiden. When it’s done and you’ve tasted it, continue.'
         : 'Start the brew on the Aiden. Enjoy!',
@@ -120,24 +168,32 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
 
   return (
     <div className="screen gb-screen">
-      <header className="screen-header">
-        <button className="back-btn" onClick={back}>← Back</button>
-        <span className="header-sub">{bean.name} · {recipe.brewSize === 'single' ? 'Single' : 'Batch'}</span>
-      </header>
+      <ScreenHeader
+        title="Guided brew"
+        context={`${bean.name} · ${recipe.brewSize === "single" ? "Single" : "Batch"}`}
+        onBack={back}
+      />
 
-      <div className="gb-progress">
-        {steps.map((_, i) => (
-          <span key={i} className={`gb-dot ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`} />
+      <ol className="gb-progress" aria-label={`Brew progress, step ${step + 1} of ${steps.length}`}>
+        {steps.map((brewStep, i) => (
+          <li
+            key={brewStep.label}
+            className={`${i === step ? "active" : ""} ${i < step ? "done" : ""}`}
+            aria-current={i === step ? "step" : undefined}
+          >
+            <span className="gb-progress-marker">{i < step ? "✓" : i + 1}</span>
+            <span className="gb-progress-label">{brewStep.label}</span>
+          </li>
         ))}
-      </div>
+      </ol>
 
-      <div className="gb-body">
+      <div className="gb-body" key={step}>
         <span className="gb-stepno">Step {step + 1} of {steps.length}</span>
         <h2 className="gb-title">{current.title}</h2>
         <div className="gb-content">{current.body}</div>
         {current.hint && <p className="gb-hint">{current.hint}</p>}
         {(step === 2 || step === 3) && (
-          <p className="gb-context">1:{recipe.ratio} · {formatTemp(temp, tempUnit)} · {cups} cups</p>
+          <p className="gb-context">1:{profileRatio} · {formatTemp(temp, tempUnit)} · {cups} cups</p>
         )}
       </div>
 

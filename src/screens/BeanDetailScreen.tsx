@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../AppContext';
 import {
   getBean,
+  getAidenProfileForBean,
   updateBean,
   getRecipeForBeanSize,
   getActiveSessionForRecipe,
@@ -13,6 +14,7 @@ import {
 import { formatTemp, BASKET_CUPS } from '../grindEngine';
 import { GrindDial } from '../components/GrindDial';
 import type { BrewSize, RoastLevel } from '../types';
+import { ScreenHeader } from "../components/ScreenHeader";
 
 interface Props {
   beanId: string;
@@ -42,14 +44,25 @@ export function BeanDetailScreen({ beanId }: Props) {
   if (!bean) return <div className="screen"><p>Bean not found.</p></div>;
 
   const recipe = getRecipeForBeanSize(beanId, basket);
+  const aidenProfile = getAidenProfileForBean(beanId);
   const session = recipe ? getActiveSessionForRecipe(recipe.id) : undefined;
   const lastEvent = session?.events[session.events.length - 1];
   const suggestDialed = lastEvent?.tasteResult === 'just-right';
-  const temp = recipe ? recipe.batch.pulseTempsF[0] ?? 200 : 0;
+  const temp = aidenProfile?.batch.pulseTempsF[0]
+    ?? (recipe ? recipe.batch.pulseTempsF[0] ?? 200 : 0);
+  const ratio = aidenProfile?.ratio ?? recipe?.ratio;
 
   function startDialing() {
     const created = createStartingRecipe(bean!, basket);
-    navigate({ id: 'guided-brew', recipeId: created.id, mode: 'rate' });
+    startGuidedBrew(created.id, "rate");
+  }
+
+  function startGuidedBrew(recipeId: string, mode: "rate" | "brew") {
+    if (!aidenProfile || aidenProfile.status !== "ready") {
+      navigate({ id: "aiden-profile", beanId, recipeId, mode });
+      return;
+    }
+    navigate({ id: "guided-brew", recipeId, mode });
   }
 
   function handleDelete() {
@@ -59,13 +72,23 @@ export function BeanDetailScreen({ beanId }: Props) {
 
   return (
     <div className="screen bean-detail">
-      <header className="screen-header">
-        <button className="back-btn" onClick={() => navigate({ id: 'home' })}>← Beans</button>
-      </header>
+      <ScreenHeader
+        title="Bean profile"
+        context={`${bean.roaster}${bean.origin ? ` · ${bean.origin}` : ""}`}
+        onBack={() => navigate({ id: "home" })}
+        backLabel="Back to beans"
+      />
 
       <div className="bd-hero">
-        <h1 className="bd-name">{bean.name}</h1>
-        <p className="bd-roaster">{bean.roaster}{bean.origin ? ` · ${bean.origin}` : ''}</p>
+        <div className="bd-identity">
+          <div>
+            <p className="screen-eyebrow">Coffee profile</p>
+            <h2 className="bd-name">{bean.name}</h2>
+          </div>
+          <span className={`bd-overall-status ${recipe?.status === "dialed-in" ? "dialed" : ""}`}>
+            {recipe?.status === "dialed-in" ? "Dialed in" : recipe ? "In progress" : "Fresh bag"}
+          </span>
+        </div>
         {bean.tastingNotes.length > 0 && (
           <div className="tasting-notes bd-notes">
             {bean.tastingNotes.map((n) => <span key={n} className="note-tag">{n}</span>)}
@@ -116,6 +139,36 @@ export function BeanDetailScreen({ beanId }: Props) {
         </div>
       </details>
 
+      <section className={`bd-aiden-card ${aidenProfile?.status ?? "needs-setup"}`}>
+        <div className="bd-aiden-copy">
+          <p className="screen-eyebrow">Aiden profile</p>
+          <h3>{aidenProfile?.name ?? bean.name}</h3>
+          <p>
+            {aidenProfile?.status === "ready"
+              ? "Saved in Fellow and ready for Guided Brew."
+              : aidenProfile?.status === "needs-update"
+                ? "A shared brew setting changed. Update it in Fellow before brewing."
+                : "Create this profile in Fellow before your first brew."}
+          </p>
+        </div>
+        <div className="bd-aiden-action">
+          <span className={`connection-status ${aidenProfile?.status === "ready" ? "connected" : ""}`}>
+            <span className="status-dot" />
+            {aidenProfile?.status === "ready"
+              ? "Ready"
+              : aidenProfile?.status === "needs-update"
+                ? "Update"
+                : "Setup"}
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate({ id: "aiden-profile", beanId })}
+          >
+            {aidenProfile?.status === "ready" ? "View" : "Open guide"}
+          </button>
+        </div>
+      </section>
+
       {/* Basket selector */}
       <div className="bd-baskets">
         {BASKETS.map(({ size, label, sub }) => {
@@ -141,7 +194,10 @@ export function BeanDetailScreen({ beanId }: Props) {
         <>
           <div className="card bd-nextbrew">
             <div className="bd-card-top">
-              <span className="bd-card-label">Next brew</span>
+              <div>
+                <span className="bd-card-label">Next brew</span>
+                <h3 className="bd-card-title">Your target recipe</h3>
+              </div>
               <button
                 className="bd-edit"
                 onClick={() => navigate({ id: 'edit-settings', beanId, brewSize: basket, recipeId: recipe.id })}
@@ -149,6 +205,7 @@ export function BeanDetailScreen({ beanId }: Props) {
                 Edit
               </button>
             </div>
+            <p className="bd-dial-kicker">Set Opus to</p>
             <GrindDial micron={recipe.grindMicron} size={148} />
             <div className="bd-metrics">
               <div className="recipe-stat">
@@ -161,7 +218,7 @@ export function BeanDetailScreen({ beanId }: Props) {
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Ratio</span>
-                <span className="stat-value">1:{recipe.ratio}</span>
+                <span className="stat-value">1:{ratio}</span>
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Temp</span>
@@ -172,19 +229,19 @@ export function BeanDetailScreen({ beanId }: Props) {
 
           {recipe.status === 'dialed-in' ? (
             <>
-              <button className="cta-btn" onClick={() => navigate({ id: 'guided-brew', recipeId: recipe.id, mode: 'brew' })}>
+              <button className="cta-btn" onClick={() => startGuidedBrew(recipe.id, "brew")}>
                 Brew it ☕
               </button>
               <button
                 className="text-btn bd-center"
-                onClick={() => { const r = reopenRecipe(recipe.id); if (r) navigate({ id: 'guided-brew', recipeId: r.id, mode: 'rate' }); }}
+                onClick={() => { const r = reopenRecipe(recipe.id); if (r) startGuidedBrew(r.id, "rate"); }}
               >
                 Reopen & tune
               </button>
             </>
           ) : (
             <>
-              <button className="cta-btn" onClick={() => navigate({ id: 'guided-brew', recipeId: recipe.id, mode: 'rate' })}>
+              <button className="cta-btn" onClick={() => startGuidedBrew(recipe.id, "rate")}>
                 Brew &amp; rate →
               </button>
               <button
