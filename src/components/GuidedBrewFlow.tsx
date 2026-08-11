@@ -127,10 +127,31 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
       title: 'Top off the water tank',
       body: (
         <div className="gb-water-visual" aria-hidden="true">
-          <span className="gb-water-drop" />
-          <span className="gb-water-line one" />
-          <span className="gb-water-line two" />
-          <span className="gb-water-line three" />
+          <svg className="gb-water-icon" viewBox="0 0 160 150">
+            <defs>
+              <linearGradient id="water-drop-gradient" x1="35" y1="18" x2="118" y2="122">
+                <stop offset="0" stopColor="#a8d8ff" />
+                <stop offset="0.48" stopColor="#5eabed" />
+                <stop offset="1" stopColor="#286b9f" />
+              </linearGradient>
+            </defs>
+            <path
+              className="gb-water-drop"
+              d="M80 12C80 12 38 60 38 88C38 112 56.8 130 80 130C103.2 130 122 112 122 88C122 60 80 12 80 12Z"
+              fill="url(#water-drop-gradient)"
+            />
+            <path
+              className="gb-water-highlight"
+              d="M58 83C59 68 69 52 80 38"
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.5)"
+              strokeLinecap="round"
+              strokeWidth="5"
+            />
+            <ellipse className="gb-water-line one" cx="80" cy="139" rx="25" ry="5" />
+            <ellipse className="gb-water-line two" cx="80" cy="139" rx="25" ry="5" />
+            <ellipse className="gb-water-line three" cx="80" cy="139" rx="25" ry="5" />
+          </svg>
         </div>
       ),
       hint: 'Just keep it full — the Aiden meters the exact water for you.',
