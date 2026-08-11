@@ -19,6 +19,7 @@ import {
 } from "../grindEngine";
 import { GrindDial } from "../components/GrindDial";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { StickyActionBar } from "../components/StickyActionBar";
 import type { BrewVariant } from "../types";
 
 interface Props {
@@ -123,7 +124,7 @@ export function EditSettingsScreen({ beanId, brewVariant, recipeId }: Props) {
   }
 
   return (
-    <div className="screen">
+    <div className="screen has-sticky-action">
       <ScreenHeader
         title={existing ? "Edit settings" : "Starting point"}
         context={`${bean.name} · ${definition.label}`}
@@ -227,16 +228,21 @@ export function EditSettingsScreen({ beanId, brewVariant, recipeId }: Props) {
         </div>
       </div>
 
-      <p className="es-profile-note">
-        {definition.basket === "single"
-          ? "Bloom and ratio are shared across all brews. Each single-serve pulse temperature is saved separately."
-          : "Bloom and ratio are shared across all brews. Brew temperature is shared by small and large batch."}
-        {" "}Profile changes must be synced in Fellow and affected dial-ins will need a check brew.
-      </p>
+      <details className="es-profile-disclosure">
+        <summary>About shared profile settings</summary>
+        <p className="es-profile-note">
+          {definition.basket === "single"
+            ? "Bloom and ratio are shared across all brews. Each single-serve pulse temperature is saved separately."
+            : "Bloom and ratio are shared across all brews. Brew temperature is shared by small and large batch."}
+          {" "}Profile changes must be synced in Fellow and affected dial-ins will need a check brew.
+        </p>
+      </details>
 
-      <button className="cta-btn" onClick={save}>
-        {existing ? "Save settings" : "Save & continue →"}
-      </button>
+      <StickyActionBar>
+        <button className="cta-btn" onClick={save}>
+          {existing ? "Save settings" : "Save & continue →"}
+        </button>
+      </StickyActionBar>
     </div>
   );
 }

@@ -2671,3 +2671,413 @@ a:focus-visible {
   margin: 2px 20px 8px;
   text-align: center;
 }
+
+/* ── Mobile-first task shell ─────────────────────────────────────────────── */
+
+html {
+  overscroll-behavior-y: none;
+}
+
+.screen {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+.has-sticky-action {
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+
+.sticky-action-bar {
+  background: linear-gradient(180deg, rgba(15, 13, 11, 0), var(--bg) 24%);
+  bottom: 0;
+  left: 50%;
+  max-width: 480px;
+  padding: 26px 16px max(12px, env(safe-area-inset-bottom));
+  position: fixed;
+  transform: translateX(-50%);
+  width: 100%;
+  z-index: 28;
+}
+
+.sticky-action-bar-inner {
+  display: flex;
+  gap: 8px;
+}
+
+.sticky-action-bar .cta-btn,
+.sticky-action-bar .secondary-btn {
+  margin: 0;
+  width: 100%;
+}
+
+.sticky-action-bar-stacked .sticky-action-bar-inner {
+  flex-direction: column;
+}
+
+.sticky-action-bar-stacked {
+  padding-top: 22px;
+}
+
+.adjustment-screen.has-sticky-action {
+  padding-bottom: calc(174px + env(safe-area-inset-bottom));
+}
+
+.screen-header {
+  padding-top: max(18px, env(safe-area-inset-top));
+}
+
+.screen-header-action {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.back-btn,
+.settings-button {
+  height: 44px;
+  min-height: 44px;
+  min-width: 44px;
+  width: 44px;
+}
+
+.roast-btn,
+.bd-edit,
+.bd-aiden-open,
+.bd-aiden-action > button,
+.remove-key-button,
+.aiden-copy-name,
+.bd-ready-profile button {
+  min-height: 44px;
+}
+
+.bd-hero {
+  padding: 12px 16px 6px;
+}
+
+.bd-name {
+  font-size: clamp(31px, 9vw, 36px);
+}
+
+.bd-notes {
+  flex-wrap: nowrap;
+  margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: none;
+}
+
+.bd-notes::-webkit-scrollbar {
+  display: none;
+}
+
+.bd-notes .note-tag {
+  flex: 0 0 auto;
+}
+
+.bd-baskets {
+  gap: 6px;
+  padding: 10px 16px 3px;
+}
+
+.bd-basket {
+  align-items: center;
+  border-radius: 12px;
+  gap: 3px;
+  justify-content: center;
+  min-height: 62px;
+  padding: 8px 5px;
+  text-align: center;
+}
+
+.bd-basket-label {
+  font-size: 14px;
+}
+
+.bd-basket-dot {
+  background: var(--text-dim);
+  border-radius: 50%;
+  height: 5px;
+  width: 5px;
+}
+
+.bd-basket-dot.dialing,
+.bd-basket-dot.recheck {
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.08);
+}
+
+.bd-basket-dot.dialed {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.08);
+}
+
+.bd-basket-status {
+  color: var(--text-dim);
+  font-size: 9px;
+  line-height: 1.1;
+}
+
+.bd-basket.active .bd-basket-status {
+  color: var(--accent-hover);
+}
+
+.bd-variant-context {
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 4px 20px 7px;
+  text-align: center;
+}
+
+.bd-aiden-card {
+  align-items: center;
+  margin-top: 7px;
+  padding: 13px 15px;
+}
+
+.bd-aiden-open {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 22px;
+  color: var(--accent-hover);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.bd-nextbrew {
+  gap: 8px;
+  margin-top: 10px;
+  padding: 16px;
+}
+
+.bd-edit {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  margin: -10px -8px -10px 0;
+  min-width: 44px;
+  padding: 8px;
+}
+
+.bd-recipe-focus {
+  align-items: center;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: minmax(128px, 0.9fr) minmax(108px, 1fr);
+  width: 100%;
+}
+
+.bd-dial-kicker {
+  margin: 0 0 -7px;
+  text-align: center;
+}
+
+.bd-recipe-focus .grind-dial {
+  gap: 3px;
+}
+
+.bd-recipe-focus .grind-dial-label {
+  font-size: 13px;
+}
+
+.bd-metrics-primary {
+  grid-template-columns: 1fr;
+  padding: 3px 11px;
+}
+
+.bd-metrics-primary .recipe-stat {
+  align-items: center;
+  flex-direction: row;
+  justify-content: space-between;
+  min-height: 35px;
+  text-align: left;
+}
+
+.bd-metrics .recipe-stat + .recipe-stat {
+  border-left: 0;
+  border-top: 1px solid var(--border);
+}
+
+.bd-nextbrew .brew-temperature-schedule {
+  padding: 9px 10px;
+}
+
+.bd-nextbrew .brew-temperature-title {
+  margin-bottom: 6px;
+}
+
+.bd-nextbrew .brew-temperature-value {
+  padding: 6px;
+}
+
+.bd-secondary-details,
+.es-profile-disclosure,
+.settings-disclosure,
+.adjustment-recipe-details {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin: 10px 16px 0;
+  overflow: hidden;
+}
+
+.bd-secondary-details > summary,
+.es-profile-disclosure > summary,
+.settings-disclosure > summary,
+.adjustment-recipe-details > summary {
+  align-items: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 48px;
+  padding: 12px 15px;
+}
+
+.bd-secondary-details > summary::-webkit-details-marker,
+.es-profile-disclosure > summary::-webkit-details-marker,
+.settings-disclosure > summary::-webkit-details-marker,
+.adjustment-recipe-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bd-secondary-details[open] .bd-research-chevron {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+
+.bd-secondary-body {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 15px;
+}
+
+.bd-secondary-body .bd-roast {
+  margin: 0;
+}
+
+.bd-secondary-body .bd-source {
+  align-self: flex-start;
+  min-height: 44px;
+}
+
+.bd-ready-dot {
+  background: var(--green);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(62, 207, 142, 0.08);
+  height: 7px;
+  width: 7px;
+}
+
+.bd-ready-profile {
+  align-items: center;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.bd-ready-profile h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.bd-ready-profile p {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.bd-ready-profile button {
+  background: none;
+  border: 0;
+  color: var(--accent-hover);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px;
+}
+
+.adjustment-recipe-details {
+  margin: 12px 0 0;
+  width: 100%;
+}
+
+.adjustment-recipe-details > summary {
+  color: var(--accent-hover);
+}
+
+.adjustment-recipe-details[open] {
+  padding-bottom: 12px;
+}
+
+.es-profile-disclosure {
+  margin: 2px 16px 8px;
+}
+
+.es-profile-disclosure .es-profile-note {
+  border-top: 1px solid var(--border);
+  margin: 0;
+  padding: 12px 16px;
+}
+
+.settings-disclosure {
+  margin: 18px 0 0;
+}
+
+.settings-disclosure-body {
+  border-top: 1px solid var(--border);
+  padding: 14px;
+}
+
+.settings-disclosure-body .key-caution {
+  margin-top: 13px;
+}
+
+.remove-key-button {
+  align-items: center;
+  display: inline-flex;
+  padding: 8px;
+}
+
+.text-btn.bd-center,
+.text-btn.bd-delete {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+@media (max-width: 350px) {
+  .screen-header-copy h1 {
+    font-size: 24px;
+  }
+
+  .bd-overall-status {
+    font-size: 9px;
+    padding: 5px 7px;
+  }
+
+  .bd-recipe-focus {
+    grid-template-columns: 124px minmax(104px, 1fr);
+  }
+
+  .bd-recipe-focus .grind-dial svg {
+    height: 124px;
+    width: 124px;
+  }
+
+  .bd-basket-label {
+    font-size: 13px;
+  }
+
+  .sticky-action-bar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}

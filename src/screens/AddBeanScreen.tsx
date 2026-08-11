@@ -45,6 +45,8 @@ export function AddBeanScreen() {
             placeholder="e.g. Counter Culture"
             value={roaster}
             onChange={(e) => setRoaster(e.target.value)}
+            autoComplete="organization"
+            enterKeyHint="next"
             required
           />
         </label>
@@ -56,6 +58,8 @@ export function AddBeanScreen() {
             placeholder="e.g. Hologram"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            autoComplete="off"
+            enterKeyHint="done"
             required
           />
         </label>
