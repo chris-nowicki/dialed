@@ -5,6 +5,7 @@ import { getSettings, saveSettings } from './storage';
 interface AppContextValue {
   screen: Screen;
   navigate: (screen: Screen) => void;
+  replace: (screen: Screen) => void;
   goBack: () => void;
   tempUnit: TempUnit;
   setTempUnit: (unit: TempUnit) => void;
@@ -22,6 +23,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory((h) => [...h, next]);
   }, []);
 
+  const replace = useCallback((next: Screen) => {
+    setHistory((current) => current.length > 0
+      ? [...current.slice(0, -1), next]
+      : [next]);
+  }, []);
+
   const goBack = useCallback(() => {
     setHistory((h) => (h.length > 1 ? h.slice(0, -1) : h));
   }, []);
@@ -32,7 +39,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AppContext.Provider value={{ screen, navigate, goBack, tempUnit, setTempUnit }}>
+    <AppContext.Provider value={{ screen, navigate, replace, goBack, tempUnit, setTempUnit }}>
       {children}
     </AppContext.Provider>
   );

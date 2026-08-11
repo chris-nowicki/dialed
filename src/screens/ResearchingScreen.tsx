@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp } from "../AppContext";
-import { getBean, updateBean } from "../storage";
+import { ensureAidenProfile, getBean, updateBean } from "../storage";
 import {
   canResearch,
   createFallbackResearch,
@@ -40,13 +40,14 @@ export function ResearchingScreen({ beanId }: Props) {
   function applyResearch(outcome: ResearchOutcome) {
     setResearch(outcome.result);
     setResearchSource(outcome.source);
-    updateBean(beanId, {
+    const updatedBean = updateBean(beanId, {
       roast: outcome.result.roast,
       origin: outcome.result.origin,
       process: outcome.result.process,
       tastingNotes: outcome.result.tastingNotes,
       description: outcome.result.description,
     });
+    if (updatedBean) ensureAidenProfile(updatedBean);
     setStatus(outcome.source === "fallback" ? "fallback" : "done");
   }
 
@@ -97,7 +98,7 @@ export function ResearchingScreen({ beanId }: Props) {
 
   if (!bean) return <div className="screen"><p>Bean not found.</p></div>;
 
-  const goToBean = () => navigate({ id: "bean-detail", beanId });
+  const goToAidenSetup = () => navigate({ id: "aiden-profile", beanId });
 
   function continueWithoutResearch() {
     applyResearch(createFallbackResearch(bean!.roast));
@@ -172,7 +173,7 @@ export function ResearchingScreen({ beanId }: Props) {
           <span className="source-pill fallback">Roast-level fallback</span>
           <h3>Your starting point is ready</h3>
           <p>{research.description}</p>
-          <button className="cta-btn" onClick={goToBean}>Continue →</button>
+          <button className="cta-btn" onClick={goToAidenSetup}>Set up Aiden →</button>
         </div>
       )}
 
@@ -209,7 +210,7 @@ export function ResearchingScreen({ beanId }: Props) {
             </p>
           </div>
 
-          <button className="cta-btn" onClick={goToBean}>Continue →</button>
+          <button className="cta-btn" onClick={goToAidenSetup}>Set up Aiden →</button>
         </>
       )}
     </div>

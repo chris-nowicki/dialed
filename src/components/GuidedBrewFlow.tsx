@@ -3,6 +3,7 @@ import { useApp } from '../AppContext';
 import {
   getRecipe,
   getBean,
+  getAidenProfileForBean,
   updateRecipe,
   getActiveSessionForRecipe,
   createSession,
@@ -25,6 +26,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
   const { navigate, goBack, tempUnit } = useApp();
   const recipe = getRecipe(recipeId);
   const bean = recipe ? getBean(recipe.beanId) : undefined;
+  const aidenProfile = recipe ? getAidenProfileForBean(recipe.beanId) : undefined;
 
   const [cups, setCups] = useState<number>(
     () => recipe?.cups ?? BASKET_CUPS[recipe?.brewSize ?? 'batch'].default,
@@ -33,14 +35,40 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
 
   if (!recipe || !bean) return <div className="screen"><p>Recipe not found.</p></div>;
 
+  if (!aidenProfile || aidenProfile.status !== "ready") {
+    return (
+      <div className="screen gb-screen">
+        <ScreenHeader title="Guided brew" context={bean.name} onBack={goBack} />
+        <div className="card gb-profile-gate">
+          <p className="screen-eyebrow">Aiden profile required</p>
+          <h2>Confirm the profile first.</h2>
+          <p>Guided Brew needs the matching profile saved in Fellow before you continue.</p>
+          <button
+            type="button"
+            className="cta-btn"
+            onClick={() => navigate({
+              id: "aiden-profile",
+              beanId: bean.id,
+              recipeId,
+              mode,
+            })}
+          >
+            Open profile guide
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const range = BASKET_CUPS[recipe.brewSize];
-  const temp = recipe.batch.pulseTempsF[0] ?? 200;
-  const dose = computeDose(cups, recipe.ratio);
+  const temp = aidenProfile.batch.pulseTempsF[0] ?? 200;
+  const profileRatio = aidenProfile.ratio;
+  const dose = computeDose(cups, profileRatio);
 
   function changeCups(next: number) {
     const clamped = Math.min(range.max, Math.max(range.min, parseFloat(next.toFixed(2))));
     setCups(clamped);
-    updateRecipe(recipeId, { cups: clamped, dose: computeDose(clamped, recipe!.ratio) });
+    updateRecipe(recipeId, { cups: clamped, dose: computeDose(clamped, profileRatio) });
   }
 
   const steps: { label: string; title: string; body: React.ReactNode; hint?: string }[] = [
@@ -50,7 +78,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
       body: (
         <div className="gb-profile">
           <span className="gb-crumb">Guided Brew › Pick Profile</span>
-          <span className="gb-profile-name">{recipe.aidenProfileName}</span>
+          <span className="gb-profile-name">{aidenProfile.name}</span>
         </div>
       ),
       hint: 'On the Aiden, choose Guided Brew, then select this profile.',
@@ -165,7 +193,7 @@ export function GuidedBrewFlow({ recipeId, mode }: Props) {
         <div className="gb-content">{current.body}</div>
         {current.hint && <p className="gb-hint">{current.hint}</p>}
         {(step === 2 || step === 3) && (
-          <p className="gb-context">1:{recipe.ratio} · {formatTemp(temp, tempUnit)} · {cups} cups</p>
+          <p className="gb-context">1:{profileRatio} · {formatTemp(temp, tempUnit)} · {cups} cups</p>
         )}
       </div>
 

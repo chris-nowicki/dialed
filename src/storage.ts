@@ -3,13 +3,23 @@
  * Schema is shaped for future shared/sellable use (createdBy, visibility ride along).
  */
 
-import type { Bean, Recipe, DialInSession, TasteEvent, TasteResult, BrewSize } from './types';
+import type {
+  AidenProfile,
+  Bean,
+  BrewSize,
+  DialInSession,
+  Recipe,
+  RoastLevel,
+  TasteEvent,
+  TasteResult,
+} from "./types";
 import { computeAdjustment, computeDose, computeStartingRecipe, OPUS_V1, BASKET_CUPS } from './grindEngine';
 
 const KEYS = {
   beans: 'dialed:beans',
   recipes: 'dialed:recipes',
   sessions: 'dialed:sessions',
+  aidenProfiles: "dialed:aiden-profiles",
   settings: 'dialed:settings',
 } as const;
 
@@ -63,9 +73,223 @@ export function updateBean(id: string, patch: Partial<Bean>): Bean | undefined {
   return updated;
 }
 
+// ─── Aiden profiles ─────────────────────────────────────────────────────────
+
+export type AidenProfileSettings = Pick<
+  AidenProfile,
+  "ratio" | "coldBrew" | "bloom" | "singleServe" | "batch"
+>;
+
+const BUILT_IN_AIDEN_PROFILES: Record<RoastLevel, AidenProfileSettings> = {
+  light: {
+    ratio: 17,
+    coldBrew: false,
+    bloom: { enabled: true, ratio: 3, timeSec: 45, tempF: 210 },
+    singleServe: { numPulses: 3, timeBetweenSec: 23, pulseTempsF: [210, 210, 210] },
+    batch: { numPulses: 1, timeBetweenSec: 30, pulseTempsF: [210] },
+  },
+  medium: {
+    ratio: 16,
+    coldBrew: false,
+    bloom: { enabled: true, ratio: 2, timeSec: 30, tempF: 205 },
+    singleServe: { numPulses: 3, timeBetweenSec: 23, pulseTempsF: [205, 205, 205] },
+    batch: { numPulses: 1, timeBetweenSec: 30, pulseTempsF: [205] },
+  },
+  dark: {
+    ratio: 16,
+    coldBrew: false,
+    bloom: { enabled: true, ratio: 2, timeSec: 30, tempF: 210 },
+    singleServe: { numPulses: 3, timeBetweenSec: 23, pulseTempsF: [185, 185, 185] },
+    batch: { numPulses: 1, timeBetweenSec: 30, pulseTempsF: [185] },
+  },
+};
+
+function cloneProfileSettings(settings: AidenProfileSettings): AidenProfileSettings {
+  return {
+    ratio: settings.ratio,
+    coldBrew: settings.coldBrew,
+    bloom: { ...settings.bloom },
+    singleServe: {
+      ...settings.singleServe,
+      pulseTempsF: [...settings.singleServe.pulseTempsF],
+    },
+    batch: {
+      ...settings.batch,
+      pulseTempsF: [...settings.batch.pulseTempsF],
+    },
+  };
+}
+
+export function getBuiltInAidenProfile(roast: RoastLevel): AidenProfileSettings {
+  return cloneProfileSettings(BUILT_IN_AIDEN_PROFILES[roast]);
+}
+
+export function getAidenProfiles(): AidenProfile[] {
+  return load<AidenProfile>(KEYS.aidenProfiles);
+}
+
+export function getAidenProfileForBean(beanId: string): AidenProfile | undefined {
+  return getAidenProfiles().find((profile) => profile.beanId === beanId);
+}
+
+function recommendedAidenProfile(bean: Bean): AidenProfileSettings {
+  const numbers = computeStartingRecipe({ roast: bean.roast, brewSize: "batch" });
+  return {
+    ratio: numbers.ratio,
+    coldBrew: false,
+    bloom: {
+      enabled: numbers.bloomEnabled,
+      ratio: numbers.bloomRatio,
+      timeSec: numbers.bloomTimeSec,
+      tempF: numbers.bloomTempF,
+    },
+    singleServe: {
+      numPulses: 3,
+      timeBetweenSec: 23,
+      pulseTempsF: [numbers.tempF, numbers.tempF, numbers.tempF],
+    },
+    batch: {
+      numPulses: 1,
+      timeBetweenSec: 30,
+      pulseTempsF: [numbers.tempF],
+    },
+  };
+}
+
+function syncRecipesToAidenProfile(profile: AidenProfile): void {
+  const recipes = getRecipes();
+  let changed = false;
+  const synced = recipes.map((recipe) => {
+    if (recipe.beanId !== profile.beanId) return recipe;
+    changed = true;
+    return {
+      ...recipe,
+      aidenProfileId: profile.id,
+      aidenProfileName: profile.name,
+      ratio: profile.ratio,
+      coldBrew: profile.coldBrew,
+      bloom: profile.bloom,
+      singleServe: profile.singleServe,
+      batch: profile.batch,
+      dose: computeDose(recipe.cups ?? BASKET_CUPS[recipe.brewSize].default, profile.ratio),
+      updatedAt: now(),
+    };
+  });
+  if (changed) save(KEYS.recipes, synced);
+}
+
+export function createAidenProfileForBean(
+  bean: Bean,
+  legacyRecipe?: Recipe,
+): AidenProfile {
+  const existing = getAidenProfileForBean(bean.id);
+  if (existing) return existing;
+
+  const settings = legacyRecipe
+    ? {
+        ratio: legacyRecipe.ratio,
+        coldBrew: legacyRecipe.coldBrew,
+        bloom: legacyRecipe.bloom,
+        singleServe: legacyRecipe.singleServe,
+        batch: legacyRecipe.batch,
+      }
+    : recommendedAidenProfile(bean);
+  const timestamp = now();
+  const profile: AidenProfile = {
+    id: uuid(),
+    beanId: bean.id,
+    name: bean.name,
+    baseRoast: bean.roast,
+    ...settings,
+    status: "needs-setup",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  save(KEYS.aidenProfiles, [...getAidenProfiles(), profile]);
+  syncRecipesToAidenProfile(profile);
+  return profile;
+}
+
+export function ensureAidenProfile(bean: Bean): AidenProfile {
+  return getAidenProfileForBean(bean.id) ?? createAidenProfileForBean(bean);
+}
+
+export function updateAidenProfile(
+  beanId: string,
+  patch: Partial<Omit<AidenProfile, "id" | "beanId" | "createdAt">>,
+  requiresConfirmation = true,
+): AidenProfile | undefined {
+  const profiles = getAidenProfiles();
+  const index = profiles.findIndex((profile) => profile.beanId === beanId);
+  if (index === -1) return undefined;
+  const current = profiles[index];
+  const status = requiresConfirmation
+    ? current.confirmedAt
+      ? "needs-update"
+      : "needs-setup"
+    : patch.status ?? current.status;
+  const updated: AidenProfile = {
+    ...current,
+    ...patch,
+    status,
+    updatedAt: now(),
+  };
+  profiles[index] = updated;
+  save(KEYS.aidenProfiles, profiles);
+  syncRecipesToAidenProfile(updated);
+  return updated;
+}
+
+export function updateAidenProfileRecipeSettings(
+  beanId: string,
+  settings: { ratio?: number; tempF?: number },
+): AidenProfile | undefined {
+  const profile = getAidenProfileForBean(beanId);
+  if (!profile) return undefined;
+  const tempF = settings.tempF;
+  const ratioChanged = settings.ratio !== undefined && settings.ratio !== profile.ratio;
+  const currentTemperatures = [
+    profile.bloom.tempF,
+    ...profile.singleServe.pulseTempsF,
+    ...profile.batch.pulseTempsF,
+  ];
+  const temperatureChanged = tempF !== undefined
+    && currentTemperatures.some((temperature) => temperature !== tempF);
+  if (!ratioChanged && !temperatureChanged) return profile;
+
+  return updateAidenProfile(beanId, {
+    ratio: settings.ratio ?? profile.ratio,
+    bloom: tempF === undefined ? profile.bloom : { ...profile.bloom, tempF },
+    singleServe: tempF === undefined
+      ? profile.singleServe
+      : {
+          ...profile.singleServe,
+          pulseTempsF: profile.singleServe.pulseTempsF.map(() => tempF),
+        },
+    batch: tempF === undefined
+      ? profile.batch
+      : {
+          ...profile.batch,
+          pulseTempsF: profile.batch.pulseTempsF.map(() => tempF),
+        },
+  });
+}
+
+export function confirmAidenProfile(beanId: string): AidenProfile | undefined {
+  const profile = getAidenProfileForBean(beanId);
+  if (!profile) return undefined;
+  const timestamp = now();
+  return updateAidenProfile(beanId, {
+    status: "ready",
+    confirmedAt: timestamp,
+    confirmedSettings: cloneProfileSettings(profile),
+  }, false);
+}
+
 /** Delete a bean and cascade-remove its recipes and dial-in sessions. */
 export function deleteBean(id: string): void {
   save(KEYS.beans, getBeans().filter((b) => b.id !== id));
+  save(KEYS.aidenProfiles, getAidenProfiles().filter((profile) => profile.beanId !== id));
   save(KEYS.recipes, getRecipes().filter((r) => r.beanId !== id));
   save(KEYS.sessions, getSessions().filter((s) => s.beanId !== id));
 }
@@ -96,25 +320,22 @@ export function getRecipeForBeanSize(beanId: string, brewSize: BrewSize): Recipe
  */
 export function createStartingRecipe(bean: Bean, brewSize: BrewSize): Recipe {
   const numbers = computeStartingRecipe({ roast: bean.roast, brewSize });
+  const profile = ensureAidenProfile(bean);
   const cups = BASKET_CUPS[brewSize].default;
   return saveRecipe({
     beanId: bean.id,
     brewMethodId: 'aiden',
     grinderModelId: 'opus-v1',
-    aidenProfileName: bean.name,
-    ratio: numbers.ratio,
-    coldBrew: false,
-    bloom: {
-      enabled: numbers.bloomEnabled,
-      ratio: numbers.bloomRatio,
-      timeSec: numbers.bloomTimeSec,
-      tempF: numbers.bloomTempF,
-    },
-    singleServe: { numPulses: 1, timeBetweenSec: 0, pulseTempsF: [numbers.tempF] },
-    batch: { numPulses: 1, timeBetweenSec: 0, pulseTempsF: [numbers.tempF] },
+    aidenProfileId: profile.id,
+    aidenProfileName: profile.name,
+    ratio: profile.ratio,
+    coldBrew: profile.coldBrew,
+    bloom: profile.bloom,
+    singleServe: profile.singleServe,
+    batch: profile.batch,
     grindMicron: numbers.grindMicron,
     grindDisplay: numbers.grindDisplay,
-    dose: computeDose(cups, numbers.ratio),
+    dose: computeDose(cups, profile.ratio),
     brewSize,
     cups,
     status: 'starting',
@@ -131,19 +352,25 @@ export interface ManualSettings {
 
 /** Create a recipe for a bean + basket from user-entered settings. */
 export function createRecipeFromSettings(bean: Bean, brewSize: BrewSize, s: ManualSettings): Recipe {
+  const profile = ensureAidenProfile(bean);
+  const updatedProfile = updateAidenProfileRecipeSettings(bean.id, {
+    ratio: s.ratio,
+    tempF: s.tempF,
+  }) ?? profile;
   return saveRecipe({
     beanId: bean.id,
     brewMethodId: 'aiden',
     grinderModelId: 'opus-v1',
-    aidenProfileName: bean.name,
-    ratio: s.ratio,
-    coldBrew: false,
-    bloom: { enabled: true, ratio: 2, timeSec: 45, tempF: s.tempF },
-    singleServe: { numPulses: 1, timeBetweenSec: 0, pulseTempsF: [s.tempF] },
-    batch: { numPulses: 1, timeBetweenSec: 0, pulseTempsF: [s.tempF] },
+    aidenProfileId: updatedProfile.id,
+    aidenProfileName: updatedProfile.name,
+    ratio: updatedProfile.ratio,
+    coldBrew: updatedProfile.coldBrew,
+    bloom: updatedProfile.bloom,
+    singleServe: updatedProfile.singleServe,
+    batch: updatedProfile.batch,
     grindMicron: s.grindMicron,
     grindDisplay: s.grindDisplay,
-    dose: computeDose(s.cups, s.ratio),
+    dose: computeDose(s.cups, updatedProfile.ratio),
     brewSize,
     cups: s.cups,
     status: 'starting',
@@ -270,15 +497,7 @@ export function recordTaste(
     });
   }
   if (adjustment.newRatio !== undefined) {
-    const updated = getRecipe(session.recipeId);
-    updateRecipe(session.recipeId, {
-      ratio: adjustment.newRatio,
-      // keep dose in sync with the new ratio at the recipe's current cup count
-      dose: computeDose(
-        updated?.cups ?? BASKET_CUPS[recipe.brewSize].default,
-        adjustment.newRatio,
-      ),
-    });
+    updateAidenProfileRecipeSettings(recipe.beanId, { ratio: adjustment.newRatio });
   }
 
   return { session: updatedSession, event };
@@ -350,8 +569,19 @@ export function migrateRecipes(): void {
   if (changed) save(KEYS.recipes, migrated);
 }
 
+export function migrateAidenProfiles(): void {
+  const beans = getBeans();
+  for (const bean of beans) {
+    if (getAidenProfileForBean(bean.id)) continue;
+    const legacyRecipe = getRecipeForBeanSize(bean.id, "batch")
+      ?? getRecipeForBeanSize(bean.id, "single");
+    createAidenProfileForBean(bean, legacyRecipe);
+  }
+}
+
 export function seedIfEmpty(): void {
   migrateRecipes();
+  migrateAidenProfiles();
   if (getBeans().length > 0) return;
 
   // Validated fallback bean — demo-safe, graceful degrade
@@ -367,24 +597,8 @@ export function seedIfEmpty(): void {
     visibility: 'private',
   });
 
-  const cups = BASKET_CUPS.batch.default;
-  const recipe = saveRecipe({
-    beanId: bean.id,
-    brewMethodId: 'aiden',
-    grinderModelId: 'opus-v1',
-    aidenProfileName: 'Hologram',
-    ratio: 16,
-    coldBrew: false,
-    bloom: { enabled: true, ratio: 2, timeSec: 45, tempF: 203 },
-    singleServe: { numPulses: 1, timeBetweenSec: 0, pulseTempsF: [203] },
-    batch: { numPulses: 1, timeBetweenSec: 0, pulseTempsF: [203] },
-    grindMicron: OPUS_V1.dialToMicron(6.5),
-    grindDisplay: '6.50',
-    dose: computeDose(cups, 16),
-    brewSize: 'batch',
-    cups,
-    status: 'starting',
-  });
-
-  void recipe; // used for side effect
+  const profile = createAidenProfileForBean(bean);
+  const recipe = createStartingRecipe(bean, "batch");
+  void profile;
+  void recipe;
 }

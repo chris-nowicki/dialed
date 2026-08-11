@@ -9,6 +9,7 @@ import { DialInTasteScreen } from './screens/DialInTasteScreen';
 import { DialInAdjustmentScreen } from './screens/DialInAdjustmentScreen';
 import { DialInConvergeScreen } from './screens/DialInConvergeScreen';
 import { AppSettingsScreen } from "./screens/AppSettingsScreen";
+import { AidenProfileScreen } from "./screens/AidenProfileScreen";
 
 export function App() {
   const { screen } = useApp();
@@ -18,6 +19,14 @@ export function App() {
       return <HomeScreen />;
     case "app-settings":
       return <AppSettingsScreen />;
+    case "aiden-profile":
+      return (
+        <AidenProfileScreen
+          beanId={screen.beanId}
+          recipeId={screen.recipeId}
+          mode={screen.mode}
+        />
+      );
     case 'add-bean':
       return <AddBeanScreen />;
     case 'researching':

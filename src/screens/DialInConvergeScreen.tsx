@@ -1,5 +1,5 @@
 import { useApp } from "../AppContext";
-import { getSession, getRecipe, getBean } from "../storage";
+import { getAidenProfileForBean, getSession, getRecipe, getBean } from "../storage";
 import { OPUS_V1 } from "../grindEngine";
 import { ScreenHeader } from "../components/ScreenHeader";
 import type { TasteResult } from "../types";
@@ -14,6 +14,7 @@ export function DialInConvergeScreen({ sessionId }: Props) {
   const session = getSession(sessionId);
   const recipe = session ? getRecipe(session.recipeId) : undefined;
   const bean = recipe ? getBean(recipe.beanId) : undefined;
+  const aidenProfile = recipe ? getAidenProfileForBean(recipe.beanId) : undefined;
 
   if (!session || !recipe || !bean) return <div className="screen"><p>Session not found.</p></div>;
 
@@ -174,7 +175,13 @@ export function DialInConvergeScreen({ sessionId }: Props) {
 
       <button
         className="cta-btn"
-        onClick={() => navigate({ id: 'guided-brew', recipeId: recipe.id, mode: 'rate' })}
+        onClick={() => {
+          if (!aidenProfile || aidenProfile.status !== "ready") {
+            navigate({ id: "aiden-profile", beanId: bean.id, recipeId: recipe.id, mode: "rate" });
+            return;
+          }
+          navigate({ id: "guided-brew", recipeId: recipe.id, mode: "rate" });
+        }}
       >
         Brew &amp; rate again →
       </button>

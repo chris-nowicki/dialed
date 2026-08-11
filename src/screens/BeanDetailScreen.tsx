@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../AppContext';
 import {
   getBean,
+  getAidenProfileForBean,
   updateBean,
   getRecipeForBeanSize,
   getActiveSessionForRecipe,
@@ -43,14 +44,25 @@ export function BeanDetailScreen({ beanId }: Props) {
   if (!bean) return <div className="screen"><p>Bean not found.</p></div>;
 
   const recipe = getRecipeForBeanSize(beanId, basket);
+  const aidenProfile = getAidenProfileForBean(beanId);
   const session = recipe ? getActiveSessionForRecipe(recipe.id) : undefined;
   const lastEvent = session?.events[session.events.length - 1];
   const suggestDialed = lastEvent?.tasteResult === 'just-right';
-  const temp = recipe ? recipe.batch.pulseTempsF[0] ?? 200 : 0;
+  const temp = aidenProfile?.batch.pulseTempsF[0]
+    ?? (recipe ? recipe.batch.pulseTempsF[0] ?? 200 : 0);
+  const ratio = aidenProfile?.ratio ?? recipe?.ratio;
 
   function startDialing() {
     const created = createStartingRecipe(bean!, basket);
-    navigate({ id: 'guided-brew', recipeId: created.id, mode: 'rate' });
+    startGuidedBrew(created.id, "rate");
+  }
+
+  function startGuidedBrew(recipeId: string, mode: "rate" | "brew") {
+    if (!aidenProfile || aidenProfile.status !== "ready") {
+      navigate({ id: "aiden-profile", beanId, recipeId, mode });
+      return;
+    }
+    navigate({ id: "guided-brew", recipeId, mode });
   }
 
   function handleDelete() {
@@ -127,6 +139,36 @@ export function BeanDetailScreen({ beanId }: Props) {
         </div>
       </details>
 
+      <section className={`bd-aiden-card ${aidenProfile?.status ?? "needs-setup"}`}>
+        <div className="bd-aiden-copy">
+          <p className="screen-eyebrow">Aiden profile</p>
+          <h3>{aidenProfile?.name ?? bean.name}</h3>
+          <p>
+            {aidenProfile?.status === "ready"
+              ? "Saved in Fellow and ready for Guided Brew."
+              : aidenProfile?.status === "needs-update"
+                ? "A shared brew setting changed. Update it in Fellow before brewing."
+                : "Create this profile in Fellow before your first brew."}
+          </p>
+        </div>
+        <div className="bd-aiden-action">
+          <span className={`connection-status ${aidenProfile?.status === "ready" ? "connected" : ""}`}>
+            <span className="status-dot" />
+            {aidenProfile?.status === "ready"
+              ? "Ready"
+              : aidenProfile?.status === "needs-update"
+                ? "Update"
+                : "Setup"}
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate({ id: "aiden-profile", beanId })}
+          >
+            {aidenProfile?.status === "ready" ? "View" : "Open guide"}
+          </button>
+        </div>
+      </section>
+
       {/* Basket selector */}
       <div className="bd-baskets">
         {BASKETS.map(({ size, label, sub }) => {
@@ -176,7 +218,7 @@ export function BeanDetailScreen({ beanId }: Props) {
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Ratio</span>
-                <span className="stat-value">1:{recipe.ratio}</span>
+                <span className="stat-value">1:{ratio}</span>
               </div>
               <div className="recipe-stat">
                 <span className="stat-label">Temp</span>
@@ -187,19 +229,19 @@ export function BeanDetailScreen({ beanId }: Props) {
 
           {recipe.status === 'dialed-in' ? (
             <>
-              <button className="cta-btn" onClick={() => navigate({ id: 'guided-brew', recipeId: recipe.id, mode: 'brew' })}>
+              <button className="cta-btn" onClick={() => startGuidedBrew(recipe.id, "brew")}>
                 Brew it ☕
               </button>
               <button
                 className="text-btn bd-center"
-                onClick={() => { const r = reopenRecipe(recipe.id); if (r) navigate({ id: 'guided-brew', recipeId: r.id, mode: 'rate' }); }}
+                onClick={() => { const r = reopenRecipe(recipe.id); if (r) startGuidedBrew(r.id, "rate"); }}
               >
                 Reopen & tune
               </button>
             </>
           ) : (
             <>
-              <button className="cta-btn" onClick={() => navigate({ id: 'guided-brew', recipeId: recipe.id, mode: 'rate' })}>
+              <button className="cta-btn" onClick={() => startGuidedBrew(recipe.id, "rate")}>
                 Brew &amp; rate →
               </button>
               <button
