@@ -17,6 +17,7 @@ import {
 } from '../grindEngine';
 import { GrindDial } from '../components/GrindDial';
 import type { BrewSize } from '../types';
+import { ScreenHeader } from "../components/ScreenHeader";
 
 interface Props {
   beanId: string;
@@ -96,10 +97,11 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
 
   return (
     <div className="screen">
-      <header className="screen-header">
-        <button className="back-btn" onClick={goBack}>← Back</button>
-        <h2>{existing ? 'Edit settings' : 'Set your starting point'}</h2>
-      </header>
+      <ScreenHeader
+        title={existing ? "Edit settings" : "Starting point"}
+        context={`${bean.name} · ${brewSize === "single" ? "Single" : "Batch"}`}
+        onBack={goBack}
+      />
 
       <p className="screen-intro">
         {existing

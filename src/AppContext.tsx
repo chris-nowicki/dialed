@@ -7,14 +7,14 @@ interface AppContextValue {
   navigate: (screen: Screen) => void;
   goBack: () => void;
   tempUnit: TempUnit;
-  toggleTempUnit: () => void;
+  setTempUnit: (unit: TempUnit) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<Screen[]>([{ id: 'home' }]);
-  const [tempUnit, setTempUnit] = useState<TempUnit>(() => getSettings().tempUnit);
+  const [tempUnit, setTempUnitState] = useState<TempUnit>(() => getSettings().tempUnit);
 
   const screen = history[history.length - 1] ?? { id: 'home' };
 
@@ -26,16 +26,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setHistory((h) => (h.length > 1 ? h.slice(0, -1) : h));
   }, []);
 
-  const toggleTempUnit = useCallback(() => {
-    setTempUnit((u) => {
-      const next: TempUnit = u === 'F' ? 'C' : 'F';
-      saveSettings({ tempUnit: next });
-      return next;
-    });
+  const setTempUnit = useCallback((unit: TempUnit) => {
+    saveSettings({ tempUnit: unit });
+    setTempUnitState(unit);
   }, []);
 
   return (
-    <AppContext.Provider value={{ screen, navigate, goBack, tempUnit, toggleTempUnit }}>
+    <AppContext.Provider value={{ screen, navigate, goBack, tempUnit, setTempUnit }}>
       {children}
     </AppContext.Provider>
   );

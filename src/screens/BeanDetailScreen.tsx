@@ -13,6 +13,7 @@ import {
 import { formatTemp, BASKET_CUPS } from '../grindEngine';
 import { GrindDial } from '../components/GrindDial';
 import type { BrewSize, RoastLevel } from '../types';
+import { ScreenHeader } from "../components/ScreenHeader";
 
 interface Props {
   beanId: string;
@@ -59,13 +60,23 @@ export function BeanDetailScreen({ beanId }: Props) {
 
   return (
     <div className="screen bean-detail">
-      <header className="screen-header">
-        <button className="back-btn" onClick={() => navigate({ id: 'home' })}>← Beans</button>
-      </header>
+      <ScreenHeader
+        title="Bean profile"
+        context={`${bean.roaster}${bean.origin ? ` · ${bean.origin}` : ""}`}
+        onBack={() => navigate({ id: "home" })}
+        backLabel="Back to beans"
+      />
 
       <div className="bd-hero">
-        <h1 className="bd-name">{bean.name}</h1>
-        <p className="bd-roaster">{bean.roaster}{bean.origin ? ` · ${bean.origin}` : ''}</p>
+        <div className="bd-identity">
+          <div>
+            <p className="screen-eyebrow">Coffee profile</p>
+            <h2 className="bd-name">{bean.name}</h2>
+          </div>
+          <span className={`bd-overall-status ${recipe?.status === "dialed-in" ? "dialed" : ""}`}>
+            {recipe?.status === "dialed-in" ? "Dialed in" : recipe ? "In progress" : "Fresh bag"}
+          </span>
+        </div>
         {bean.tastingNotes.length > 0 && (
           <div className="tasting-notes bd-notes">
             {bean.tastingNotes.map((n) => <span key={n} className="note-tag">{n}</span>)}
@@ -141,7 +152,10 @@ export function BeanDetailScreen({ beanId }: Props) {
         <>
           <div className="card bd-nextbrew">
             <div className="bd-card-top">
-              <span className="bd-card-label">Next brew</span>
+              <div>
+                <span className="bd-card-label">Next brew</span>
+                <h3 className="bd-card-title">Your target recipe</h3>
+              </div>
               <button
                 className="bd-edit"
                 onClick={() => navigate({ id: 'edit-settings', beanId, brewSize: basket, recipeId: recipe.id })}
@@ -149,6 +163,7 @@ export function BeanDetailScreen({ beanId }: Props) {
                 Edit
               </button>
             </div>
+            <p className="bd-dial-kicker">Set Opus to</p>
             <GrindDial micron={recipe.grindMicron} size={148} />
             <div className="bd-metrics">
               <div className="recipe-stat">

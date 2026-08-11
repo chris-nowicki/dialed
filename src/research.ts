@@ -16,11 +16,23 @@
  * roast-level-only starting recipe (researchBean) or re-prompt (classify).
  */
 
-import { sdk } from '@theaiplatform/miniapp-sdk';
-import type { BeanResearchResult, RoastLevel } from './types';
+import { sdk } from "@theaiplatform/miniapp-sdk";
+import type { BeanResearchResult, RoastLevel } from "./types";
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-const LOCAL_KEY = 'dialed:openai-key';
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const LOCAL_KEY = "dialed:openai-key";
+
+export type ResearchSource = "platform" | "local" | "fallback";
+
+export interface ResearchOutcome {
+  result: BeanResearchResult;
+  source: ResearchSource;
+}
+
+export type ApiKeyTestResult =
+  | { status: "valid" }
+  | { status: "invalid"; message: string }
+  | { status: "unreachable"; message: string };
 
 export interface ResearchRequest {
   roaster: string;
@@ -43,7 +55,7 @@ async function getCredentialRef(): Promise<string | null> {
     if (sdk?.credentials?.listHttp) {
       const creds = await sdk.credentials.listHttp();
       const match = creds.find(
-        (c) => c.credentialType === 'http_bearer' && /openai/i.test(c.displayName),
+        (c) => c.credentialType === "http_bearer" && /openai/i.test(c.displayName),
       );
       cachedCredentialRef = match?.id ?? null;
     } else {
@@ -59,54 +71,66 @@ async function getCredentialRef(): Promise<string | null> {
  * POST a Chat Completions body and return the parsed JSON response, or null on
  * any failure. Prefers the host credential; falls back to the runtime key.
  */
-async function chatCompletion(body: unknown): Promise<unknown | null> {
+interface ChatCompletionResult {
+  data: unknown;
+  source: Exclude<ResearchSource, "fallback">;
+}
+
+async function chatCompletion(body: unknown): Promise<ChatCompletionResult | null> {
   const payload = JSON.stringify(body);
 
   // 1. Host-managed credential — key stays in the platform vault.
   const ref = await getCredentialRef();
-  if (sdk?.http?.request && ref) {
+  if (ref) {
     try {
+      if (!sdk?.http?.request) throw new Error("Host HTTP capability is unavailable");
       const resp = await sdk.http.request(
         {
-          method: 'POST',
+          method: "POST",
           url: OPENAI_URL,
-          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          headers: [{ name: "Content-Type", value: "application/json" }],
           body: payload,
           timeoutMs: 15000,
         },
         { credentialRef: ref },
       );
       if (resp.status < 200 || resp.status >= 300 || !resp.bodyText) {
-        console.warn('[Dialed] Host research call failed:', resp.status);
-        return null;
+        console.warn("[Dialed] Host research call failed:", resp.status);
+      } else {
+        return {
+          data: JSON.parse(resp.bodyText) as unknown,
+          source: "platform",
+        };
       }
-      return JSON.parse(resp.bodyText) as unknown;
     } catch (err) {
-      console.warn('[Dialed] Host research call error:', err);
-      return null;
+      console.warn("[Dialed] Host research call error:", err);
     }
   }
 
-  // 2. Fallback — runtime user key via browser fetch (portable targets).
+  // 2. Runtime user key. This is also attempted after a host request fails,
+  // making it a real backup instead of only an alternate capability path.
   const key = getLocalKey();
   if (!key) return null;
   try {
     const resp = await fetch(OPENAI_URL, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
       },
       body: payload,
       signal: AbortSignal.timeout(15000),
     });
     if (!resp.ok) {
-      console.warn('[Dialed] Research API error:', resp.status);
+      console.warn("[Dialed] Research API error:", resp.status);
       return null;
     }
-    return (await resp.json()) as unknown;
+    return {
+      data: (await resp.json()) as unknown,
+      source: "local",
+    };
   } catch (err) {
-    console.warn('[Dialed] Research fetch error:', err);
+    console.warn("[Dialed] Research fetch error:", err);
     return null;
   }
 }
@@ -121,22 +145,25 @@ function firstChoiceContent(data: unknown): string | null {
 // ---------------------------------------------------------------------------
 
 // Fallback when the LLM call can't complete.
-function fallbackResearch(roast: RoastLevel): BeanResearchResult {
+export function createFallbackResearch(roast: RoastLevel): ResearchOutcome {
   return {
-    roast,
-    origin: 'Unknown',
-    process: 'washed',
-    tastingNotes: [],
-    sourceCitations: [],
-    description:
-      'Could not reach the research service. Starting recipe is based on roast level alone — the taste loop will get you there.',
+    source: "fallback",
+    result: {
+      roast,
+      origin: "Unknown",
+      process: "washed",
+      tastingNotes: [],
+      sourceCitations: [],
+      description:
+        "Live research was not available. Your starting recipe uses the roast level you selected — the taste loop will get you there.",
+    },
   };
 }
 
 export async function researchBean(
   req: ResearchRequest,
-  fallbackRoast: RoastLevel = 'medium',
-): Promise<BeanResearchResult> {
+  fallbackRoast: RoastLevel = "medium",
+): Promise<ResearchOutcome> {
   const prompt = `You are a specialty coffee expert. Research the following coffee bean and return a JSON object with these exact fields:
 - roast: one of "light", "medium", or "dark"
 - origin: country or region (string)
@@ -150,33 +177,36 @@ Do NOT invent URLs or citations — you cannot browse the web, so any link would
 If you are unsure of a field, make your best expert estimate from the roaster and name.
 Respond ONLY with valid JSON, no markdown fences.`;
 
-  const data = await chatCompletion({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
+  const completion = await chatCompletion({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
     temperature: 0.3,
     max_tokens: 500,
-    response_format: { type: 'json_object' },
+    response_format: { type: "json_object" },
   });
 
-  const content = firstChoiceContent(data);
-  if (!content) return fallbackResearch(fallbackRoast);
+  const content = firstChoiceContent(completion?.data);
+  if (!completion || !content) return createFallbackResearch(fallbackRoast);
 
   try {
     const parsed = JSON.parse(content) as Partial<BeanResearchResult>;
     return {
-      roast: (['light', 'medium', 'dark'].includes(parsed.roast ?? '')
-        ? parsed.roast
-        : fallbackRoast) as RoastLevel,
-      origin: parsed.origin ?? 'Unknown',
-      process: parsed.process ?? 'washed',
-      tastingNotes: Array.isArray(parsed.tastingNotes) ? parsed.tastingNotes : [],
-      // The model can't browse, so we never trust it for URLs — the UI offers a
-      // real web-search link instead of fabricated "sources".
-      sourceCitations: [],
-      description: parsed.description ?? '',
+      source: completion.source,
+      result: {
+        roast: (["light", "medium", "dark"].includes(parsed.roast ?? "")
+          ? parsed.roast
+          : fallbackRoast) as RoastLevel,
+        origin: parsed.origin ?? "Unknown",
+        process: parsed.process ?? "washed",
+        tastingNotes: Array.isArray(parsed.tastingNotes) ? parsed.tastingNotes : [],
+        // The model can't browse, so we never trust it for URLs — the UI offers a
+        // real web-search link instead of fabricated "sources".
+        sourceCitations: [],
+        description: parsed.description ?? "",
+      },
     };
   } catch {
-    return fallbackResearch(fallbackRoast);
+    return createFallbackResearch(fallbackRoast);
   }
 }
 
@@ -186,20 +216,20 @@ Respond ONLY with valid JSON, no markdown fences.`;
  */
 export async function classifyTasteText(
   text: string,
-): Promise<'sour' | 'bitter' | 'weak' | 'strong' | 'just-right' | null> {
+): Promise<"sour" | "bitter" | "weak" | "strong" | "just-right" | null> {
   const prompt = `Classify this coffee tasting note into exactly one of: sour, bitter, weak, strong, just-right.
 Note: "${text}"
 Respond with only the single word.`;
 
-  const data = await chatCompletion({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
+  const completion = await chatCompletion({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
     temperature: 0,
     max_tokens: 10,
   });
 
-  const word = firstChoiceContent(data)?.trim().toLowerCase();
-  const valid = ['sour', 'bitter', 'weak', 'strong', 'just-right'] as const;
+  const word = firstChoiceContent(completion?.data)?.trim().toLowerCase();
+  const valid = ["sour", "bitter", "weak", "strong", "just-right"] as const;
   return valid.includes(word as (typeof valid)[number])
     ? (word as (typeof valid)[number])
     : null;
@@ -211,14 +241,28 @@ Respond with only the single word.`;
 
 function getLocalKey(): string {
   try {
-    return localStorage.getItem(LOCAL_KEY) ?? '';
+    return localStorage.getItem(LOCAL_KEY) ?? "";
   } catch {
-    return '';
+    return "";
   }
 }
 
-export function setApiKey(key: string): void {
-  localStorage.setItem(LOCAL_KEY, key);
+export function setApiKey(key: string): boolean {
+  try {
+    localStorage.setItem(LOCAL_KEY, key.trim());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function removeApiKey(): boolean {
+  try {
+    localStorage.removeItem(LOCAL_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** True if a runtime key is stored. (The host-credential path is separate.) */
@@ -231,6 +275,55 @@ export function hasLocalKey(): boolean {
  * available (preferred) or a runtime key is stored (fallback).
  */
 export async function canResearch(): Promise<boolean> {
-  if (sdk?.http?.request && (await getCredentialRef())) return true;
-  return hasLocalKey();
+  // Check the standalone path first. The SDK is a lazy proxy that throws when
+  // any capability is read outside The AI Platform runtime.
+  if (hasLocalKey()) return true;
+
+  try {
+    return Boolean((await getCredentialRef()) && sdk?.http?.request);
+  } catch {
+    return false;
+  }
+}
+
+/** Validate a candidate local key without changing the currently stored key. */
+export async function testApiKey(key: string): Promise<ApiKeyTestResult> {
+  const candidate = key.trim();
+  if (!candidate) {
+    return { status: "invalid", message: "Enter an API key first." };
+  }
+
+  try {
+    const response = await fetch(OPENAI_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${candidate}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "Reply with OK." }],
+        max_tokens: 2,
+        temperature: 0,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (response.ok) return { status: "valid" };
+    if (response.status === 401 || response.status === 403) {
+      return {
+        status: "invalid",
+        message: "OpenAI rejected this key. Check it and try again.",
+      };
+    }
+    return {
+      status: "unreachable",
+      message: `OpenAI returned status ${response.status}. Your current key was not changed.`,
+    };
+  } catch {
+    return {
+      status: "unreachable",
+      message: "Could not reach OpenAI. Check your connection and try again.",
+    };
+  }
 }

@@ -1,5 +1,5 @@
 import { useApp } from '../AppContext';
-import { getBeans, getRecipeForBeanSize } from '../storage';
+import { getBeans, getRecipes, getRecipeForBeanSize } from "../storage";
 import type { Bean, BrewSize } from '../types';
 
 type BasketState = 'none' | 'dialing' | 'dialed';
@@ -38,8 +38,11 @@ function BeanRow({ bean, onOpen }: { bean: Bean; onOpen: () => void }) {
 }
 
 export function HomeScreen() {
-  const { navigate, tempUnit, toggleTempUnit } = useApp();
+  const { navigate } = useApp();
   const beans = getBeans();
+  const recipes = getRecipes();
+  const activeRecipes = recipes.filter((recipe) => recipe.status === "starting").length;
+  const dialedRecipes = recipes.filter((recipe) => recipe.status === "dialed-in").length;
 
   return (
     <div className="screen home-screen">
@@ -47,17 +50,44 @@ export function HomeScreen() {
         <div className="app-logo">☕</div>
         <h1 className="app-title">Dialed</h1>
         <button
-          className="temp-toggle"
-          onClick={toggleTempUnit}
-          aria-label={`Switch to °${tempUnit === 'F' ? 'C' : 'F'}`}
+          className="settings-button"
+          onClick={() => navigate({ id: "app-settings" })}
+          aria-label="Open settings"
+          title="Settings"
         >
-          °{tempUnit}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h7M15 17h5" />
+            <circle cx="16" cy="7" r="2" />
+            <circle cx="8" cy="12" r="2" />
+            <circle cx="13" cy="17" r="2" />
+          </svg>
         </button>
       </header>
 
+      <section className="home-hero" aria-labelledby="home-hero-title">
+        <div className="home-hero-copy">
+          <p className="home-eyebrow">Your dial-in coach</p>
+          <h2 id="home-hero-title">Find the sweet spot.</h2>
+          <p>Turn every taste into one confident adjustment for the next brew.</p>
+        </div>
+        <div className="home-dial" aria-hidden="true">
+          <span className="home-dial-ring" />
+          <span className="home-dial-pointer" />
+          <span className="home-dial-center" />
+          <span className="home-dial-sweet">sweet</span>
+        </div>
+        {beans.length > 0 && (
+          <div className="home-pulse" aria-label="Dial-in summary">
+            <span><strong>{beans.length}</strong> bean{beans.length === 1 ? "" : "s"}</span>
+            <span><strong>{activeRecipes}</strong> dialing</span>
+            <span><strong>{dialedRecipes}</strong> dialed in</span>
+          </div>
+        )}
+      </section>
+
       {beans.length > 0 ? (
         <>
-          <h2 className="section-title">Your beans</h2>
+          <h2 className="section-title">On your bench</h2>
           <ul className="bean-list">
             {beans.map((bean) => (
               <BeanRow

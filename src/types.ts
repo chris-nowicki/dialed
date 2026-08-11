@@ -133,6 +133,7 @@ export interface BeanResearchResult {
 
 export type Screen =
   | { id: 'home' }
+  | { id: "app-settings" }
   | { id: 'add-bean' }
   | { id: 'researching'; beanId: string }
   | { id: 'bean-detail'; beanId: string }

@@ -1,6 +1,8 @@
-import { useApp } from '../AppContext';
-import { getSession, getRecipe, getBean } from '../storage';
-import { OPUS_V1 } from '../grindEngine';
+import { useApp } from "../AppContext";
+import { getSession, getRecipe, getBean } from "../storage";
+import { OPUS_V1 } from "../grindEngine";
+import { ScreenHeader } from "../components/ScreenHeader";
+import type { TasteResult } from "../types";
 
 interface Props {
   sessionId: string;
@@ -16,8 +18,12 @@ export function DialInConvergeScreen({ sessionId }: Props) {
   if (!session || !recipe || !bean) return <div className="screen"><p>Session not found.</p></div>;
 
   const grinder = OPUS_V1;
-  const rangeMin = grinder.minMicron;
-  const rangeMax = grinder.maxMicron;
+  const plottedMicrons = [...session.events.map((event) => event.grindMicron), recipe.grindMicron];
+  const plotMin = Math.min(...plottedMicrons);
+  const plotMax = Math.max(...plottedMicrons);
+  const plotPadding = Math.max(40, (plotMax - plotMin) * 0.45);
+  const rangeMin = Math.max(grinder.minMicron, plotMin - plotPadding);
+  const rangeMax = Math.min(grinder.maxMicron, plotMax + plotPadding);
   const rangeSpan = rangeMax - rangeMin;
 
   function toPercent(micron: number): number {
@@ -39,16 +45,34 @@ export function DialInConvergeScreen({ sessionId }: Props) {
     'just-right': '#10b981',
   };
 
+  const tasteLabels: Record<TasteResult, string> = {
+    sour: "Sour",
+    bitter: "Bitter",
+    weak: "Weak",
+    strong: "Strong",
+    "just-right": "Just right",
+  };
+
+  const hasBracket = sourBound !== undefined && bitterBound !== undefined;
+
   return (
-    <div className="screen">
-      <header className="screen-header">
-        <button className="back-btn" onClick={goBack}>← Back</button>
-        <h2>Convergence</h2>
-      </header>
+    <div className="screen converge-screen">
+      <ScreenHeader title="Dial-in journey" context={`${bean.name} · ${session.events.length} brew${session.events.length === 1 ? "" : "s"}`} onBack={goBack} />
+
+      <div className="converge-intro">
+        <p className="screen-eyebrow">Closing in</p>
+        <h2>{hasBracket ? "The sweet spot is taking shape." : "Every cup narrows the search."}</h2>
+        <p>{hasBracket ? "Your sour and bitter bounds now frame the target." : "Keep tasting—Dialed is mapping the edges of this coffee."}</p>
+      </div>
 
       <div className="card converge-card">
-        <h3 className="converge-title">Grind Dial-In Progress</h3>
-        <p className="converge-subtitle">{bean.name} · {bean.roaster}</p>
+        <div className="converge-card-heading">
+          <div>
+            <p className="converge-kicker">Opus grind map</p>
+            <h3 className="converge-title">Current target: {currentDial}</h3>
+          </div>
+          <span className="converge-brew-count">{session.events.length} tasted</span>
+        </div>
 
         {/* Number line */}
         <div className="number-line-container" role="img" aria-label="Grind convergence number line">
@@ -98,8 +122,7 @@ export function DialInConvergeScreen({ sessionId }: Props) {
               <div className="marker-label">{currentDial}</div>
             </div>
 
-            {/* Dot for each tasted event */}
-            {session.events.map((ev) => (
+            {session.events.map((ev, index) => (
               <div
                 key={ev.id}
                 className="event-dot"
@@ -107,48 +130,41 @@ export function DialInConvergeScreen({ sessionId }: Props) {
                   left: `${toPercent(ev.grindMicron)}%`,
                   background: tasteColors[ev.tasteResult] ?? '#888',
                 }}
-                title={`${ev.grindDisplay} → ${ev.tasteResult}`}
-              />
+                title={`Brew ${index + 1}: ${ev.grindDisplay} → ${tasteLabels[ev.tasteResult]}`}
+              >
+                <span>{index + 1}</span>
+              </div>
             ))}
           </div>
 
           <div className="number-line-labels">
-            <span>Finer ←</span>
-            <span>→ Coarser</span>
+            <span>← Finer</span>
+            <span>Coarser →</span>
           </div>
 
-          <div className="number-line-legend">
-            {sourBound !== undefined && (
-              <span className="legend-item sour">
-                🟡 Sour ≥ {grinder.micronToDial(sourBound).toFixed(2)}
-              </span>
-            )}
-            {bitterBound !== undefined && (
-              <span className="legend-item bitter">
-                🔴 Bitter ≤ {grinder.micronToDial(bitterBound).toFixed(2)}
-              </span>
-            )}
-            {sourBound !== undefined && bitterBound !== undefined && (
-              <span className="legend-item sweet">
-                🟢 Sweet spot
-              </span>
-            )}
+          <div className="number-line-legend" aria-label="Flavor zones">
+            <span className="legend-item bitter"><i /> Bitter edge</span>
+            <span className="legend-item sweet"><i /> Sweet spot</span>
+            <span className="legend-item sour"><i /> Sour edge</span>
           </div>
         </div>
 
         {/* Iteration history */}
         <div className="iteration-history">
-          <h4>Brew History</h4>
+          <h4>Brew history</h4>
           <ul className="event-list">
             {events.map((ev, i) => (
-              <li key={ev.id} className="event-item">
-                <span className="event-num">#{session.events.length - i}</span>
-                <span className="event-dial">Opus {ev.grindDisplay}</span>
+              <li key={ev.id} className={`event-item ${i === 0 ? "latest" : ""}`}>
+                <span className="event-num">{session.events.length - i}</span>
+                <span className="event-details">
+                  <span className="event-dial">Opus {ev.grindDisplay}</span>
+                  <span className="event-meta">Brew #{session.events.length - i}{i === 0 ? " · latest" : ""}</span>
+                </span>
                 <span
                   className="event-taste"
                   style={{ color: tasteColors[ev.tasteResult] }}
                 >
-                  {ev.tasteResult}
+                  {tasteLabels[ev.tasteResult]}
                 </span>
               </li>
             ))}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../AppContext';
 import { saveBean } from '../storage';
 import type { RoastLevel } from '../types';
+import { ScreenHeader } from "../components/ScreenHeader";
 
 export function AddBeanScreen() {
   const { navigate, goBack } = useApp();
@@ -28,10 +29,12 @@ export function AddBeanScreen() {
 
   return (
     <div className="screen">
-      <header className="screen-header">
-        <button className="back-btn" onClick={goBack}>← Back</button>
-        <h2>Add a bean</h2>
-      </header>
+      <ScreenHeader title="Add a bean" onBack={goBack} />
+
+      <div className="form-intro">
+        <p className="screen-eyebrow">Start with the bag</p>
+        <p>We’ll research the coffee, then build a smart first recipe for your setup.</p>
+      </div>
 
       <form className="bean-form" onSubmit={handleAddNew}>
         <label className="field-label">

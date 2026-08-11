@@ -8,6 +8,7 @@ import { GuidedBrewFlow } from './components/GuidedBrewFlow';
 import { DialInTasteScreen } from './screens/DialInTasteScreen';
 import { DialInAdjustmentScreen } from './screens/DialInAdjustmentScreen';
 import { DialInConvergeScreen } from './screens/DialInConvergeScreen';
+import { AppSettingsScreen } from "./screens/AppSettingsScreen";
 
 export function App() {
   const { screen } = useApp();
@@ -15,6 +16,8 @@ export function App() {
   switch (screen.id) {
     case 'home':
       return <HomeScreen />;
+    case "app-settings":
+      return <AppSettingsScreen />;
     case 'add-bean':
       return <AddBeanScreen />;
     case 'researching':

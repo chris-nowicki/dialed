@@ -1,7 +1,8 @@
-import { useApp } from '../AppContext';
-import { getSession, getRecipe, getBean, markDialedIn } from '../storage';
-import { formatTemp } from '../grindEngine';
-import { GrindDial } from '../components/GrindDial';
+import { useApp } from "../AppContext";
+import { getSession, getRecipe, getBean, markDialedIn } from "../storage";
+import { formatTemp } from "../grindEngine";
+import { GrindDial } from "../components/GrindDial";
+import { ScreenHeader } from "../components/ScreenHeader";
 
 interface Props {
   sessionId: string;
@@ -20,19 +21,46 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
   if (!event) return <div className="screen"><p>Event not found.</p></div>;
 
   const batchTemp = recipe.batch.pulseTempsF[0] ?? 200;
-  const justRight = event.tasteResult === 'just-right';
+  const justRight = event.tasteResult === "just-right";
   const tasteEmojis: Record<string, string> = {
     sour: '😬', bitter: '😤', weak: '💧', strong: '💪', 'just-right': '✨',
   };
 
   const goToBean = () => navigate({ id: 'bean-detail', beanId: bean.id });
 
+  const changedSetting = event.grindMicron !== recipe.grindMicron
+    ? {
+        label: "Grind",
+        before: `Opus ${event.grindDisplay}`,
+        after: `Opus ${recipe.grindDisplay}`,
+      }
+    : event.ratio !== recipe.ratio
+      ? {
+          label: "Ratio",
+          before: `1:${event.ratio}`,
+          after: `1:${recipe.ratio}`,
+        }
+      : event.tempF !== batchTemp
+        ? {
+            label: "Temperature",
+            before: formatTemp(event.tempF, tempUnit),
+            after: formatTemp(batchTemp, tempUnit),
+          }
+        : null;
+
   return (
-    <div className="screen">
-      <header className="screen-header">
-        <button className="back-btn" onClick={goBack}>← Back</button>
-        <h2>{justRight ? 'Nice!' : 'Next brew'}</h2>
-      </header>
+    <div className={`screen adjustment-screen ${justRight ? "is-success" : ""}`}>
+      <ScreenHeader
+        title={justRight ? "Sweet spot found" : "Your next move"}
+        context={`${bean.name} · Brew #${session.events.findIndex((item) => item.id === eventId) + 1}`}
+        onBack={goBack}
+      />
+
+      {justRight && (
+        <div className="success-burst" aria-hidden="true">
+          <span>✦</span><span>✧</span><span>✦</span>
+        </div>
+      )}
 
       <div className="card adjustment-card">
         <div className="taste-result-row">
@@ -41,12 +69,29 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
             {event.tasteResult.charAt(0).toUpperCase() + event.tasteResult.slice(1)}
           </span>
         </div>
-        <p className="narration">{event.narration}</p>
+        <div>
+          <p className="adjustment-kicker">You tasted</p>
+          <p className="narration">{event.narration}</p>
+        </div>
       </div>
 
       {!justRight && (
         <div className="card new-settings-card">
-          <h3 className="new-settings-title">Try this next time</h3>
+          <div className="adjustment-heading">
+            <div>
+              <p className="screen-eyebrow">One confident change</p>
+              <h3 className="new-settings-title">Try this next time</h3>
+            </div>
+            <span className="adjustment-count">1 variable</span>
+          </div>
+          {changedSetting && (
+            <div className="setting-change" aria-label={`${changedSetting.label} changed from ${changedSetting.before} to ${changedSetting.after}`}>
+              <span className="setting-change-label">{changedSetting.label}</span>
+              <span className="setting-change-value old">{changedSetting.before}</span>
+              <span className="setting-change-arrow">→</span>
+              <span className="setting-change-value new">{changedSetting.after}</span>
+            </div>
+          )}
           <GrindDial micron={recipe.grindMicron} size={140} />
           <div className="recipe-grid adj-grid">
             <div className="recipe-stat">
