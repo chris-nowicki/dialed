@@ -1452,27 +1452,6 @@ a:focus-visible {
   font-weight: 800;
 }
 
-.home-pulse {
-  align-items: center;
-  border-top: 1px solid var(--border);
-  bottom: 0;
-  color: var(--text-dim);
-  display: flex;
-  font-size: 10px;
-  gap: 0;
-  grid-column: 1;
-  margin-top: 17px;
-  padding-top: 12px;
-  position: relative;
-  z-index: 2;
-}
-
-.home-pulse strong {
-  color: var(--text);
-  font-size: 14px;
-  margin-right: 4px;
-}
-
 .section-title {
   letter-spacing: 1.1px;
   padding: 14px 20px 8px;
@@ -2229,10 +2208,6 @@ a:focus-visible {
 }
 
 @media (max-width: 380px) {
-  .home-pulse {
-    gap: 8px;
-  }
-
   .gb-progress-label {
     font-size: 8px;
   }

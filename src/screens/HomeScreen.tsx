@@ -74,16 +74,11 @@ export function HomeScreen() {
             <span>Bitter</span>
           </div>
         </div>
-        {beans.length > 0 && (
-          <div className="home-pulse" aria-label="Dial-in summary">
-            <span><strong>{beans.length}</strong> bean{beans.length === 1 ? "" : "s"} on your bench</span>
-          </div>
-        )}
       </section>
 
       {beans.length > 0 ? (
         <>
-          <h2 className="section-title">On your bench</h2>
+          <h2 className="section-title">Beans</h2>
           <ul className="bean-list">
             {beans.map((bean) => (
               <BeanRow
