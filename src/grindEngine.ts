@@ -9,7 +9,13 @@
  * loop corrects it over time. Never present a converted number as precise truth.
  */
 
-import type { GrinderModel, RoastLevel, BrewSize, TasteResult } from './types';
+import type {
+  AidenBasket,
+  BrewVariant,
+  GrinderModel,
+  RoastLevel,
+  TasteResult,
+} from "./types";
 
 // ─── Opus V1 Mapping ──────────────────────────────────────────────────────────
 // Dial: 1.00 – 11.00 in 0.25 steps (41 positions)
@@ -54,12 +60,11 @@ export const GRINDERS: Record<string, GrinderModel> = {
 
 // ─── Starting Recipe Lookup ───────────────────────────────────────────────────
 // Seeded from Fellow guidance + PRD anchors.
-// Table: (roastLevel, brewSize) → starting dial position on Opus V1
-
-const STARTING_DIAL_TABLE: Record<RoastLevel, Record<BrewSize, number>> = {
-  light:  { single: 6.0,  batch: 6.5  },
-  medium: { single: 5.75, batch: 6.25 },
-  dark:   { single: 5.25, batch: 5.75 },
+// Fellow's published Aiden starting points for the original stepped Opus.
+const STARTING_DIAL_TABLE: Record<BrewVariant, number> = {
+  single: 6.5,
+  "small-batch": 8,
+  "large-batch": 10.5,
 };
 
 /** Temperature by roast (°F) — midpoint of PRD ranges */
@@ -82,11 +87,55 @@ const ML_PER_OZ = 29.5735;
 /** mL of water per Aiden "cup" (≈147.9) */
 export const ML_PER_CUP = OZ_PER_CUP * ML_PER_OZ;
 
-/** Cup-count range + default per basket (cone = single 1–3 cups, flat = batch 4–10) */
-export const BASKET_CUPS: Record<BrewSize, { min: number; max: number; step: number; default: number }> = {
-  single: { min: 1, max: 3, step: 0.5, default: 2 },
-  batch: { min: 4, max: 10, step: 0.5, default: 6 },
+export interface BrewVariantDefinition {
+  label: string;
+  shortLabel: string;
+  description: string;
+  basket: AidenBasket;
+  cups: { min: number; max: number; step: number; default: number };
+  startingDial: number;
+}
+
+export const BREW_VARIANTS: Record<BrewVariant, BrewVariantDefinition> = {
+  single: {
+    label: "Single Serve",
+    shortLabel: "Single",
+    description: "Cone · 1–3 cups",
+    basket: "single",
+    cups: { min: 1, max: 3, step: 0.5, default: 2 },
+    startingDial: STARTING_DIAL_TABLE.single,
+  },
+  "small-batch": {
+    label: "Small Batch",
+    shortLabel: "Small",
+    description: "Flat · 3.5–5 cups",
+    basket: "batch",
+    cups: { min: 3.5, max: 5, step: 0.5, default: 4 },
+    startingDial: STARTING_DIAL_TABLE["small-batch"],
+  },
+  "large-batch": {
+    label: "Large Batch",
+    shortLabel: "Large",
+    description: "Flat · 5.5–10 cups",
+    basket: "batch",
+    cups: { min: 5.5, max: 10, step: 0.5, default: 6 },
+    startingDial: STARTING_DIAL_TABLE["large-batch"],
+  },
 };
+
+export const BREW_VARIANT_ORDER: BrewVariant[] = [
+  "single",
+  "small-batch",
+  "large-batch",
+];
+
+export function brewVariantForLegacyRecipe(
+  brewSize: "single" | "batch" | undefined,
+  cups: number | undefined,
+): BrewVariant {
+  if (brewSize === "single") return "single";
+  return cups !== undefined && cups <= 5 ? "small-batch" : "large-batch";
+}
 
 /** Grams of coffee to weigh for `cups` at a 1:`ratio` brew (matches the Aiden). */
 export function computeDose(cups: number, ratio: number): number {
@@ -99,21 +148,16 @@ export function cupsToOz(cups: number): number {
   return Math.round(cups * OZ_PER_CUP * 10) / 10;
 }
 
-/** Default dose (g) — legacy seed fallback */
-const DEFAULT_DOSE = computeDose(BASKET_CUPS.batch.default, DEFAULT_RATIO);
-
 export interface StartingRecipeParams {
   roast: RoastLevel;
-  brewSize: BrewSize;
+  brewVariant: BrewVariant;
   grinderId?: string;
 }
 
 export interface StartingRecipeNumbers {
   grindMicron: number;
-  grindDisplay: string;
   tempF: number;
   ratio: number;
-  dose: number;
   bloomEnabled: boolean;
   bloomRatio: number;
   bloomTimeSec: number;
@@ -122,17 +166,14 @@ export interface StartingRecipeNumbers {
 
 export function computeStartingRecipe(params: StartingRecipeParams): StartingRecipeNumbers {
   const grinder = GRINDERS[params.grinderId ?? 'opus-v1'] ?? OPUS_V1;
-  const startDial = STARTING_DIAL_TABLE[params.roast][params.brewSize];
+  const startDial = STARTING_DIAL_TABLE[params.brewVariant];
   const grindMicron = grinder.dialToMicron(startDial);
-  const grindDisplay = grinder.micronToDial(grindMicron).toFixed(2);
   const tempF = STARTING_TEMP_TABLE[params.roast];
 
   return {
     grindMicron,
-    grindDisplay,
     tempF,
     ratio: DEFAULT_RATIO,
-    dose: DEFAULT_DOSE,
     bloomEnabled: true,
     bloomRatio: 2,
     bloomTimeSec: 45,
@@ -141,25 +182,23 @@ export function computeStartingRecipe(params: StartingRecipeParams): StartingRec
 }
 
 // ─── Taste → Adjustment Rules ─────────────────────────────────────────────────
-// Priority: grind → temperature → ratio
-// Grind uses bracketing (binary search once both bounds are known).
+// Extraction changes grind; strength changes ratio. Temperature schedules are
+// deliberately user-edited because a whole-cup taste cannot identify one pulse.
 
-export type AdjustmentAxis = 'grind' | 'temperature' | 'ratio';
+export type AdjustmentAxis = "grind" | "ratio";
 
 export interface AdjustmentResult {
   axis: AdjustmentAxis;
   newGrindMicron?: number;
   newGrindDisplay?: string;
   deltaMicron?: number;
-  newTempF?: number;
   newRatio?: number;
-  direction: 'finer' | 'coarser' | 'hotter' | 'cooler' | 'tighter' | 'looser' | 'none';
+  direction: "finer" | "coarser" | "tighter" | "looser" | "none";
   narration: string;
 }
 
 const GRIND_STEP_LARGE = 4 * OPUS_DIAL_STEP; // 1.0 dial unit = ~93µm — initial big step
 const GRIND_STEP_SMALL = 2 * OPUS_DIAL_STEP; // 0.5 dial unit = ~46µm — after first bound
-// TEMP_STEP_F and temperature adjustment are roadmap (post-v1)
 const RATIO_STEP = 1; // 1:16 → 1:15 (tighter) or 1:17 (looser)
 
 export function computeAdjustment(

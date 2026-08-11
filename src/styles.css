@@ -748,6 +748,7 @@ html, body, #root {
 .chip-none { color: var(--text-dim); border: 1px solid var(--border); }
 .chip-dialing { color: var(--yellow); background: rgba(245, 158, 11, 0.12); }
 .chip-dialed { color: var(--green); background: rgba(62, 207, 142, 0.12); }
+.chip-recheck { color: var(--accent); background: rgba(196, 138, 83, 0.14); }
 
 /* ── Empty log ────────────────────────────────────────────────────────────── */
 
@@ -1081,6 +1082,13 @@ html, body, #root {
 .gb-profile { display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .gb-crumb { font-size: 13px; color: var(--text-dim); }
 .gb-profile-name { font-size: 30px; font-weight: 800; color: var(--accent); }
+.gb-profile-temps {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 330px;
+  text-align: center;
+}
 
 .gb-cups { display: flex; align-items: center; gap: 24px; }
 .gb-step-btn {
@@ -1189,7 +1197,12 @@ html, body, #root {
 
 .bd-empty-basket .cta-btn, .bd-empty-basket .bd-inline-cta { margin: 0; width: 100%; }
 
-.bd-baskets { display: flex; gap: 10px; padding: 12px 16px; }
+.bd-baskets {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 12px 16px;
+}
 .bd-basket {
   flex: 1;
   display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
@@ -1207,7 +1220,8 @@ html, body, #root {
   font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
   color: var(--text-dim); align-self: flex-start;
 }
-.bd-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; }
+.bd-metrics { display: grid; gap: 10px; width: 100%; }
+.bd-metrics-primary { grid-template-columns: repeat(3, 1fr); }
 .bd-metrics .recipe-stat { align-items: center; text-align: center; gap: 2px; }
 .bd-metrics .stat-value { font-size: 17px; }
 
@@ -1265,8 +1279,76 @@ html, body, #root {
 
 .new-settings-card { display: flex; flex-direction: column; align-items: center; }
 .new-settings-card .new-settings-title { align-self: flex-start; }
-.adj-grid { grid-template-columns: repeat(3, 1fr); margin-top: 14px; margin-bottom: 0; }
+.adj-grid {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 14px;
+  margin-top: 14px;
+  width: 100%;
+}
 .adj-grid .recipe-stat { align-items: center; text-align: center; }
+
+.brew-temperature-schedule {
+  background: rgba(13, 11, 10, 0.62);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  width: 100%;
+}
+
+.brew-temperature-title {
+  color: var(--text-dim);
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.7px;
+  margin-bottom: 9px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.brew-temperature-values {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+}
+
+.brew-temperature-value {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 6px;
+}
+
+.brew-temperature-value span {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.brew-temperature-value strong {
+  color: var(--text);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.progress-link {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.progress-link svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 18px;
+}
 
 /* ── Demo shine pass ─────────────────────────────────────────────────────── */
 
@@ -1780,39 +1862,42 @@ a:focus-visible {
 }
 
 .gb-water-visual {
-  border-bottom: 1px solid rgba(96, 165, 250, 0.4);
-  overflow: hidden;
+  filter: drop-shadow(0 18px 26px rgba(56, 139, 205, 0.16));
 }
 
-.gb-water-drop {
-  background: linear-gradient(145deg, #84c2ff, #3e83bd);
-  border-radius: 65% 35% 66% 34% / 62% 35% 65% 38%;
-  box-shadow: 0 12px 35px rgba(96, 165, 250, 0.22);
-  height: 64px;
-  left: 43px;
-  position: absolute;
-  top: 22px;
-  transform: rotate(45deg);
-  width: 64px;
+.gb-water-icon {
+  height: 150px;
+  overflow: visible;
+  width: 160px;
+}
+
+.gb-water-drop,
+.gb-water-highlight {
+  animation: waterDropFloat 2.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .gb-water-line {
   animation: waterRipple 2.1s ease-out infinite;
-  border: 1px solid rgba(96, 165, 250, 0.38);
-  border-radius: 50%;
-  bottom: 14px;
-  height: 18px;
-  left: 38px;
-  position: absolute;
-  width: 74px;
+  fill: none;
+  stroke: rgba(96, 165, 250, 0.48);
+  stroke-width: 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 .gb-water-line.two { animation-delay: 0.7s; }
 .gb-water-line.three { animation-delay: 1.4s; }
 
 @keyframes waterRipple {
-  from { opacity: 0.8; transform: scale(0.35); }
-  to { opacity: 0; transform: scale(1.45); }
+  from { opacity: 0.75; transform: scale(0.45); }
+  to { opacity: 0; transform: scale(1.65); }
+}
+
+@keyframes waterDropFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .gb-cup {

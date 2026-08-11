@@ -1,7 +1,20 @@
 import { useState } from 'react';
 import { useApp } from '../AppContext';
-import { getAidenProfileForBean, getSession, getRecipe, getBean, recordTaste } from '../storage';
-import { computeAdjustment, OPUS_V1, formatTemp, formatGrindFromMicron } from '../grindEngine';
+import {
+  getAidenProfileForBean,
+  getBean,
+  getPulseTemperatures,
+  getRecipe,
+  getSession,
+  recordTaste,
+} from "../storage";
+import {
+  BREW_VARIANTS,
+  OPUS_V1,
+  computeAdjustment,
+  formatGrindFromMicron,
+  formatTemp,
+} from "../grindEngine";
 import type { TasteResult } from '../types';
 import { ScreenHeader } from "../components/ScreenHeader";
 
@@ -39,17 +52,24 @@ export function DialInTasteScreen({ sessionId }: Props) {
 
   const [selected, setSelected] = useState<TasteResult | null>(null);
 
-  if (!session || !recipe || !bean) return <div className="screen"><p>Session not found.</p></div>;
+  if (!session || !recipe || !bean || !aidenProfile) {
+    return <div className="screen"><p>Session not found.</p></div>;
+  }
 
-  const batchTemp = aidenProfile?.batch.pulseTempsF[0] ?? recipe.batch.pulseTempsF[0] ?? 200;
-  const ratio = aidenProfile?.ratio ?? recipe.ratio;
+  const definition = BREW_VARIANTS[recipe.brewVariant];
+  const pulseTemps = getPulseTemperatures(aidenProfile, recipe.brewVariant);
+  const adjustmentTemp = pulseTemps[0] ?? aidenProfile.bloom.tempF;
+  const temperatureSummary = definition.basket === "single"
+    ? `B ${formatTemp(aidenProfile.bloom.tempF, tempUnit)} · P ${pulseTemps.map((temperature) => formatTemp(temperature, tempUnit)).join("/")}`
+    : formatTemp(adjustmentTemp, tempUnit);
+  const ratio = aidenProfile.ratio;
   const iterationNum = session.events.length + 1;
 
   function handleTaste(taste: TasteResult) {
     setSelected(taste);
     const adjustment = computeAdjustment(
       taste,
-      { grindMicron: recipe!.grindMicron, tempF: batchTemp, ratio },
+      { grindMicron: recipe!.grindMicron, tempF: adjustmentTemp, ratio },
       { sourBound: session!.sourBound, bitterBound: session!.bitterBound },
       OPUS_V1,
     );
@@ -72,7 +92,7 @@ export function DialInTasteScreen({ sessionId }: Props) {
       <div className="current-settings card">
         <div className="settings-row">
           <span>Opus</span><strong>{formatGrindFromMicron(recipe.grindMicron).dial}</strong>
-          <span>Temp</span><strong>{formatTemp(batchTemp, tempUnit)}</strong>
+          <span>Temp</span><strong>{temperatureSummary}</strong>
           <span>Ratio</span><strong>1:{ratio}</strong>
         </div>
       </div>

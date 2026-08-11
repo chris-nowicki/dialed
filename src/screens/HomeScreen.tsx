@@ -1,25 +1,30 @@
-import { useApp } from '../AppContext';
-import { getBeans, getRecipeForBeanSize } from "../storage";
-import type { Bean, BrewSize } from '../types';
+import { useApp } from "../AppContext";
+import { BREW_VARIANT_ORDER, BREW_VARIANTS } from "../grindEngine";
+import { getBeans, getRecipeForBeanVariant } from "../storage";
+import type { Bean, BrewVariant } from "../types";
 
-type BasketState = 'none' | 'dialing' | 'dialed';
+type BasketState = "none" | "dialing" | "dialed" | "recheck";
 
-function basketState(beanId: string, brewSize: BrewSize): BasketState {
-  const r = getRecipeForBeanSize(beanId, brewSize);
-  if (!r) return 'none';
-  return r.status === 'dialed-in' ? 'dialed' : 'dialing';
+function variantState(beanId: string, brewVariant: BrewVariant): BasketState {
+  const r = getRecipeForBeanVariant(beanId, brewVariant);
+  if (!r) return "none";
+  if (r.status === "dialed-in") return "dialed";
+  return r.status === "needs-recheck" ? "recheck" : "dialing";
 }
 
-const CHIP_LABEL: Record<Exclude<BasketState, 'none'>, string> = {
-  dialing: 'Dialing',
-  dialed: 'Dialed in',
+const CHIP_LABEL: Record<Exclude<BasketState, "none">, string> = {
+  dialing: "Dialing",
+  dialed: "Dialed in",
+  recheck: "Check again",
 };
 
 function BeanRow({ bean, onOpen }: { bean: Bean; onOpen: () => void }) {
-  const baskets: BrewSize[] = ['single', 'batch'];
-  const chips = baskets
-    .map((b) => ({ b, s: basketState(bean.id, b) }))
-    .filter((x) => x.s !== 'none');
+  const chips = BREW_VARIANT_ORDER
+    .map((brewVariant) => ({
+      brewVariant,
+      state: variantState(bean.id, brewVariant),
+    }))
+    .filter((item) => item.state !== "none");
 
   return (
     <li className="bean-item selectable" onClick={onOpen}>
@@ -27,9 +32,9 @@ function BeanRow({ bean, onOpen }: { bean: Bean; onOpen: () => void }) {
       <div className="bean-meta">{bean.roaster}{bean.origin ? ` · ${bean.origin}` : ''}</div>
       <div className="bean-chips">
         {chips.length === 0 && <span className="chip chip-none">Not started</span>}
-        {chips.map(({ b, s }) => (
-          <span key={b} className={`chip chip-${s}`}>
-            {b === 'single' ? 'Single' : 'Batch'}: {CHIP_LABEL[s as 'dialing' | 'dialed']}
+        {chips.map(({ brewVariant, state }) => (
+          <span key={brewVariant} className={`chip chip-${state}`}>
+            {BREW_VARIANTS[brewVariant].shortLabel}: {CHIP_LABEL[state as Exclude<BasketState, "none">]}
           </span>
         ))}
       </div>

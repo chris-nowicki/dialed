@@ -19,7 +19,10 @@ export function DialInConvergeScreen({ sessionId }: Props) {
   if (!session || !recipe || !bean) return <div className="screen"><p>Session not found.</p></div>;
 
   const grinder = OPUS_V1;
-  const plottedMicrons = [...session.events.map((event) => event.grindMicron), recipe.grindMicron];
+  const plottedMicrons = [
+    ...session.events.map((event) => event.settings.grindMicron),
+    recipe.grindMicron,
+  ];
   const plotMin = Math.min(...plottedMicrons);
   const plotMax = Math.max(...plottedMicrons);
   const plotPadding = Math.max(40, (plotMax - plotMin) * 0.45);
@@ -128,10 +131,10 @@ export function DialInConvergeScreen({ sessionId }: Props) {
                 key={ev.id}
                 className="event-dot"
                 style={{
-                  left: `${toPercent(ev.grindMicron)}%`,
+                  left: `${toPercent(ev.settings.grindMicron)}%`,
                   background: tasteColors[ev.tasteResult] ?? '#888',
                 }}
-                title={`Brew ${index + 1}: ${ev.grindDisplay} → ${tasteLabels[ev.tasteResult]}`}
+                title={`Brew ${index + 1}: ${grinder.micronToDial(ev.settings.grindMicron).toFixed(2)} → ${tasteLabels[ev.tasteResult]}`}
               >
                 <span>{index + 1}</span>
               </div>
@@ -158,7 +161,9 @@ export function DialInConvergeScreen({ sessionId }: Props) {
               <li key={ev.id} className={`event-item ${i === 0 ? "latest" : ""}`}>
                 <span className="event-num">{session.events.length - i}</span>
                 <span className="event-details">
-                  <span className="event-dial">Opus {ev.grindDisplay}</span>
+                  <span className="event-dial">
+                    Opus {grinder.micronToDial(ev.settings.grindMicron).toFixed(2)}
+                  </span>
                   <span className="event-meta">Brew #{session.events.length - i}{i === 0 ? " · latest" : ""}</span>
                 </span>
                 <span

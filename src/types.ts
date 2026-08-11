@@ -43,8 +43,9 @@ export interface GrinderModel {
 
 // ─── Recipe ───────────────────────────────────────────────────────────────────
 
-export type RecipeStatus = 'starting' | 'dialed-in';
-export type BrewSize = 'single' | 'batch';
+export type RecipeStatus = "starting" | "dialed-in" | "needs-recheck";
+export type BrewVariant = "single" | "small-batch" | "large-batch";
+export type AidenBasket = "single" | "batch";
 
 export interface BloomSettings {
   enabled: boolean;
@@ -91,24 +92,13 @@ export interface Recipe {
   beanId: string;
   brewMethodId: string;
   grinderModelId: string;
-  aidenProfileId?: string;
-  aidenProfileName: string;
-  /** e.g. 16 means 1:16 coffee-to-water */
-  ratio: number;
-  coldBrew: boolean;
-  bloom: BloomSettings;
-  singleServe: PulseBlock;
-  batch: PulseBlock;
+  aidenProfileId: string;
   /** Canonical grind in microns */
   grindMicron: number;
-  /** Human-readable dial position, e.g. "6.25" */
-  grindDisplay: string;
-  /** Dose in grams */
-  dose: number;
-  /** Which Aiden basket this dial-in is for (cone = single, flat = batch) */
-  brewSize: BrewSize;
-  /** Last chosen cup count for this basket — drives dose */
-  cups?: number;
+  /** Independent dial-in target; both batch variants use the flat basket. */
+  brewVariant: BrewVariant;
+  /** Last chosen cup count within the variant. */
+  cups: number;
   status: RecipeStatus;
   createdAt: string;
   updatedAt: string;
@@ -118,12 +108,20 @@ export interface Recipe {
 
 export type TasteResult = 'sour' | 'bitter' | 'weak' | 'strong' | 'just-right';
 
+export interface BrewSettingsSnapshot {
+  brewVariant: BrewVariant;
+  cups: number;
+  grindMicron: number;
+  ratio: number;
+  bloomTempF: number;
+  pulseTempsF: number[];
+  /** Legacy events only had one temperature and cannot recover per-pour values. */
+  temperatureDetail: "complete" | "legacy-single-value";
+}
+
 export interface TasteEvent {
   id: string;
-  grindMicron: number;
-  grindDisplay: string;
-  tempF: number;
-  ratio: number;
+  settings: BrewSettingsSnapshot;
   tasteResult: TasteResult;
   narration: string;
   timestamp: string;
@@ -164,7 +162,7 @@ export type Screen =
   | { id: 'add-bean' }
   | { id: 'researching'; beanId: string }
   | { id: 'bean-detail'; beanId: string }
-  | { id: 'edit-settings'; beanId: string; brewSize: BrewSize; recipeId?: string }
+  | { id: "edit-settings"; beanId: string; brewVariant: BrewVariant; recipeId?: string }
   | { id: 'guided-brew'; recipeId: string; mode: 'rate' | 'brew' }
   | { id: 'taste'; sessionId: string }
   | { id: 'adjustment'; sessionId: string; eventId: string }

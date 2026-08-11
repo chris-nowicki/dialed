@@ -1,30 +1,29 @@
-import { useState } from 'react';
-import { useApp } from '../AppContext';
+import { useState } from "react";
+import { useApp } from "../AppContext";
 import {
-  getBean,
-  getAidenProfileForBean,
-  getRecipe,
-  updateRecipe,
   createRecipeFromSettings,
   ensureAidenProfile,
+  getAidenProfileForBean,
+  getBean,
+  getRecipe,
   updateAidenProfileRecipeSettings,
-} from '../storage';
+  updateRecipe,
+} from "../storage";
 import {
+  BREW_VARIANTS,
   OPUS_V1,
-  computeStartingRecipe,
   computeDose,
-  formatTemp,
-  formatGrind,
+  computeStartingRecipe,
   cupsToOz,
-  BASKET_CUPS,
-} from '../grindEngine';
-import { GrindDial } from '../components/GrindDial';
-import type { BrewSize } from '../types';
+  formatTemp,
+} from "../grindEngine";
+import { GrindDial } from "../components/GrindDial";
 import { ScreenHeader } from "../components/ScreenHeader";
+import type { BrewVariant } from "../types";
 
 interface Props {
   beanId: string;
-  brewSize: BrewSize;
+  brewVariant: BrewVariant;
   recipeId?: string;
 }
 
@@ -33,11 +32,19 @@ const RATIO_MAX = 20;
 const TEMP_MIN = 185;
 const TEMP_MAX = 210;
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v));
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
-function Stepper({ onDec, onInc, children }: { onDec: () => void; onInc: () => void; children: React.ReactNode }) {
+function Stepper({
+  onDec,
+  onInc,
+  children,
+}: {
+  onDec: () => void;
+  onInc: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <div className="es-stepper">
       <button className="gb-step-btn es-step" onClick={onDec} aria-label="Decrease">−</button>
@@ -47,70 +54,86 @@ function Stepper({ onDec, onInc, children }: { onDec: () => void; onInc: () => v
   );
 }
 
-export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
+export function EditSettingsScreen({ beanId, brewVariant, recipeId }: Props) {
   const { navigate, goBack, tempUnit } = useApp();
   const bean = getBean(beanId);
   const existing = recipeId ? getRecipe(recipeId) : undefined;
-  const aidenProfile = bean
+  const profile = bean
     ? getAidenProfileForBean(beanId) ?? ensureAidenProfile(bean)
     : undefined;
+  const definition = BREW_VARIANTS[brewVariant];
+  const startingNumbers = computeStartingRecipe({
+    roast: bean?.roast ?? "medium",
+    brewVariant,
+  });
+  const [dial, setDial] = useState(
+    OPUS_V1.micronToDial(existing?.grindMicron ?? startingNumbers.grindMicron),
+  );
+  const [ratio, setRatio] = useState(profile?.ratio ?? startingNumbers.ratio);
+  const [bloomTempF, setBloomTempF] = useState(
+    profile?.bloom.tempF ?? startingNumbers.bloomTempF,
+  );
+  const [pulseTempsF, setPulseTempsF] = useState<number[]>(() => {
+    if (!profile) return [startingNumbers.tempF];
+    const pulseBlock = definition.basket === "single"
+      ? profile.singleServe
+      : profile.batch;
+    return pulseBlock.pulseTempsF.slice(0, pulseBlock.numPulses);
+  });
+  const [cups, setCups] = useState(existing?.cups ?? definition.cups.default);
 
-  const seed = existing
-    ? {
-        dial: OPUS_V1.micronToDial(existing.grindMicron),
-        ratio: aidenProfile?.ratio ?? existing.ratio,
-        tempF: aidenProfile?.batch.pulseTempsF[0] ?? existing.batch.pulseTempsF[0] ?? 200,
-        cups: existing.cups ?? BASKET_CUPS[brewSize].default,
-      }
-    : (() => {
-        const n = computeStartingRecipe({ roast: bean?.roast ?? 'medium', brewSize });
-        return {
-          dial: OPUS_V1.micronToDial(n.grindMicron),
-          ratio: n.ratio,
-          tempF: n.tempF,
-          cups: BASKET_CUPS[brewSize].default,
-        };
-      })();
+  if (!bean || !profile) {
+    return <div className="screen"><p>Bean not found.</p></div>;
+  }
 
-  const [dial, setDial] = useState(seed.dial);
-  const [ratio, setRatio] = useState(seed.ratio);
-  const [tempF, setTempF] = useState(seed.tempF);
-  const [cups, setCups] = useState(seed.cups);
-
-  if (!bean) return <div className="screen"><p>Bean not found.</p></div>;
-
-  const range = BASKET_CUPS[brewSize];
   const grindMicron = OPUS_V1.dialToMicron(dial);
-  const grindDisplay = formatGrind(dial).dial.toFixed(2);
   const dose = computeDose(cups, ratio);
+
+  function changePulseTemperature(index: number, delta: number) {
+    setPulseTempsF((temperatures) => temperatures.map((temperature, pulseIndex) => (
+      pulseIndex === index
+        ? clamp(temperature + delta, TEMP_MIN, TEMP_MAX)
+        : temperature
+    )));
+  }
 
   function save() {
     if (existing) {
-      updateRecipe(existing.id, {
-        grindMicron,
-        grindDisplay,
-        cups,
-        dose,
+      updateRecipe(existing.id, { grindMicron, cups });
+      updateAidenProfileRecipeSettings(beanId, {
+        ratio,
+        bloomTempF,
+        singleServePulseTempsF: definition.basket === "single"
+          ? pulseTempsF
+          : undefined,
+        batchPulseTempF: definition.basket === "batch"
+          ? pulseTempsF[0]
+          : undefined,
       });
-      updateAidenProfileRecipeSettings(beanId, { ratio, tempF });
     } else {
-      createRecipeFromSettings(bean!, brewSize, { grindMicron, grindDisplay, ratio, tempF, cups });
+      createRecipeFromSettings(bean!, brewVariant, {
+        grindMicron,
+        ratio,
+        bloomTempF,
+        pulseTempsF,
+        cups,
+      });
     }
-    navigate({ id: 'bean-detail', beanId });
+    navigate({ id: "bean-detail", beanId });
   }
 
   return (
     <div className="screen">
       <ScreenHeader
         title={existing ? "Edit settings" : "Starting point"}
-        context={`${bean.name} · ${brewSize === "single" ? "Single" : "Batch"}`}
+        context={`${bean.name} · ${definition.label}`}
         onBack={goBack}
       />
 
       <p className="screen-intro">
         {existing
-          ? 'Override the current numbers for this brew.'
-          : `Enter your own numbers for the ${brewSize === 'single' ? 'single (cone)' : 'batch (flat)'} basket.`}
+          ? "Override the current numbers for this brew."
+          : `Enter your own numbers for ${definition.label.toLowerCase()}.`}
       </p>
 
       <div className="card es-card">
@@ -118,9 +141,29 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
           <GrindDial dial={dial} size={148} />
         </div>
         <div className="es-grind-steps">
-          <button className="gb-step-btn es-step" onClick={() => setDial((d) => clamp(parseFloat((d - OPUS_V1.dialStep).toFixed(2)), OPUS_V1.dialMin, OPUS_V1.dialMax))} aria-label="Coarser">−</button>
+          <button
+            className="gb-step-btn es-step"
+            onClick={() => setDial((currentDial) => clamp(
+              parseFloat((currentDial - OPUS_V1.dialStep).toFixed(2)),
+              OPUS_V1.dialMin,
+              OPUS_V1.dialMax,
+            ))}
+            aria-label="Finer"
+          >
+            −
+          </button>
           <span className="es-grind-hint">1 tick</span>
-          <button className="gb-step-btn es-step" onClick={() => setDial((d) => clamp(parseFloat((d + OPUS_V1.dialStep).toFixed(2)), OPUS_V1.dialMin, OPUS_V1.dialMax))} aria-label="Finer">+</button>
+          <button
+            className="gb-step-btn es-step"
+            onClick={() => setDial((currentDial) => clamp(
+              parseFloat((currentDial + OPUS_V1.dialStep).toFixed(2)),
+              OPUS_V1.dialMin,
+              OPUS_V1.dialMax,
+            ))}
+            aria-label="Coarser"
+          >
+            +
+          </button>
         </div>
       </div>
 
@@ -128,28 +171,50 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
         <div className="es-row">
           <span className="es-label">Ratio</span>
           <Stepper
-            onDec={() => setRatio((r) => clamp(r - 1, RATIO_MIN, RATIO_MAX))}
-            onInc={() => setRatio((r) => clamp(r + 1, RATIO_MIN, RATIO_MAX))}
+            onDec={() => setRatio((currentRatio) => clamp(currentRatio - 1, RATIO_MIN, RATIO_MAX))}
+            onInc={() => setRatio((currentRatio) => clamp(currentRatio + 1, RATIO_MIN, RATIO_MAX))}
           >
             <span className="es-value">1:{ratio}</span>
           </Stepper>
         </div>
 
         <div className="es-row">
-          <span className="es-label">Temp</span>
+          <span className="es-label">Bloom temp</span>
           <Stepper
-            onDec={() => setTempF((t) => clamp(t - 1, TEMP_MIN, TEMP_MAX))}
-            onInc={() => setTempF((t) => clamp(t + 1, TEMP_MIN, TEMP_MAX))}
+            onDec={() => setBloomTempF((temperature) => clamp(temperature - 1, TEMP_MIN, TEMP_MAX))}
+            onInc={() => setBloomTempF((temperature) => clamp(temperature + 1, TEMP_MIN, TEMP_MAX))}
           >
-            <span className="es-value">{formatTemp(tempF, tempUnit)}</span>
+            <span className="es-value">{formatTemp(bloomTempF, tempUnit)}</span>
           </Stepper>
         </div>
+
+        {pulseTempsF.map((temperature, index) => (
+          <div className="es-row" key={`${brewVariant}-pulse-${index + 1}`}>
+            <span className="es-label">
+              {definition.basket === "single" ? `Pulse ${index + 1} temp` : "Brew temp"}
+            </span>
+            <Stepper
+              onDec={() => changePulseTemperature(index, -1)}
+              onInc={() => changePulseTemperature(index, 1)}
+            >
+              <span className="es-value">{formatTemp(temperature, tempUnit)}</span>
+            </Stepper>
+          </div>
+        ))}
 
         <div className="es-row">
           <span className="es-label">Cups</span>
           <Stepper
-            onDec={() => setCups((c) => clamp(parseFloat((c - range.step).toFixed(2)), range.min, range.max))}
-            onInc={() => setCups((c) => clamp(parseFloat((c + range.step).toFixed(2)), range.min, range.max))}
+            onDec={() => setCups((currentCups) => clamp(
+              parseFloat((currentCups - definition.cups.step).toFixed(2)),
+              definition.cups.min,
+              definition.cups.max,
+            ))}
+            onInc={() => setCups((currentCups) => clamp(
+              parseFloat((currentCups + definition.cups.step).toFixed(2)),
+              definition.cups.min,
+              definition.cups.max,
+            ))}
           >
             <span className="es-value">{cups}</span>
             <span className="es-sub">{cupsToOz(cups)} oz</span>
@@ -163,12 +228,14 @@ export function EditSettingsScreen({ beanId, brewSize, recipeId }: Props) {
       </div>
 
       <p className="es-profile-note">
-        Ratio and temperature belong to the shared Aiden profile and apply to both baskets.
-        Changing either will require a quick update in Fellow.
+        {definition.basket === "single"
+          ? "Bloom and ratio are shared across all brews. Each single-serve pulse temperature is saved separately."
+          : "Bloom and ratio are shared across all brews. Brew temperature is shared by small and large batch."}
+        {" "}Profile changes must be synced in Fellow and affected dial-ins will need a check brew.
       </p>
 
       <button className="cta-btn" onClick={save}>
-        {existing ? 'Save settings' : 'Save & continue →'}
+        {existing ? "Save settings" : "Save & continue →"}
       </button>
     </div>
   );

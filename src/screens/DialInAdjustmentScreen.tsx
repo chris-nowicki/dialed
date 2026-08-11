@@ -1,6 +1,18 @@
 import { useApp } from "../AppContext";
-import { getAidenProfileForBean, getSession, getRecipe, getBean, markDialedIn } from "../storage";
-import { formatTemp } from "../grindEngine";
+import {
+  getAidenProfileForBean,
+  getBean,
+  getPulseTemperatures,
+  getRecipe,
+  getSession,
+  markDialedIn,
+} from "../storage";
+import {
+  BREW_VARIANTS,
+  computeDose,
+  formatGrindFromMicron,
+} from "../grindEngine";
+import { BrewTemperatureSchedule } from "../components/BrewTemperatureSchedule";
 import { GrindDial } from "../components/GrindDial";
 import { ScreenHeader } from "../components/ScreenHeader";
 
@@ -16,13 +28,16 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
   const bean = recipe ? getBean(recipe.beanId) : undefined;
   const aidenProfile = recipe ? getAidenProfileForBean(recipe.beanId) : undefined;
 
-  if (!session || !recipe || !bean) return <div className="screen"><p>Session not found.</p></div>;
+  if (!session || !recipe || !bean || !aidenProfile) {
+    return <div className="screen"><p>Session not found.</p></div>;
+  }
 
   const event = session.events.find((e) => e.id === eventId);
   if (!event) return <div className="screen"><p>Event not found.</p></div>;
 
-  const batchTemp = aidenProfile?.batch.pulseTempsF[0] ?? recipe.batch.pulseTempsF[0] ?? 200;
-  const currentRatio = aidenProfile?.ratio ?? recipe.ratio;
+  const definition = BREW_VARIANTS[recipe.brewVariant];
+  const pulseTemps = getPulseTemperatures(aidenProfile, recipe.brewVariant);
+  const currentRatio = aidenProfile.ratio;
   const justRight = event.tasteResult === "just-right";
   const tasteEmojis: Record<string, string> = {
     sour: '😬', bitter: '😤', weak: '💧', strong: '💪', 'just-right': '✨',
@@ -43,25 +58,19 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
     navigate({ id: "guided-brew", recipeId: recipe!.id, mode: "rate" });
   }
 
-  const changedSetting = event.grindMicron !== recipe.grindMicron
+  const changedSetting = event.settings.grindMicron !== recipe.grindMicron
     ? {
         label: "Grind",
-        before: `Opus ${event.grindDisplay}`,
-        after: `Opus ${recipe.grindDisplay}`,
+        before: `Opus ${formatGrindFromMicron(event.settings.grindMicron).dial}`,
+        after: `Opus ${formatGrindFromMicron(recipe.grindMicron).dial}`,
       }
-    : event.ratio !== currentRatio
+    : event.settings.ratio !== currentRatio
       ? {
           label: "Ratio",
-          before: `1:${event.ratio}`,
+          before: `1:${event.settings.ratio}`,
           after: `1:${currentRatio}`,
         }
-      : event.tempF !== batchTemp
-        ? {
-            label: "Temperature",
-            before: formatTemp(event.tempF, tempUnit),
-            after: formatTemp(batchTemp, tempUnit),
-          }
-        : null;
+      : null;
 
   return (
     <div className={`screen adjustment-screen ${justRight ? "is-success" : ""}`}>
@@ -110,18 +119,20 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
           <GrindDial micron={recipe.grindMicron} size={140} />
           <div className="recipe-grid adj-grid">
             <div className="recipe-stat">
-              <span className="stat-label">Temp</span>
-              <span className="stat-value">{formatTemp(batchTemp, tempUnit)}</span>
-            </div>
-            <div className="recipe-stat">
               <span className="stat-label">Ratio</span>
               <span className="stat-value">1:{currentRatio}</span>
             </div>
             <div className="recipe-stat">
               <span className="stat-label">Dose</span>
-              <span className="stat-value">{recipe.dose} g</span>
+              <span className="stat-value">{computeDose(recipe.cups, currentRatio)} g</span>
             </div>
           </div>
+          <BrewTemperatureSchedule
+            basket={definition.basket}
+            bloomTempF={aidenProfile.bloom.tempF}
+            pulseTempsF={pulseTemps}
+            tempUnit={tempUnit}
+          />
         </div>
       )}
 
@@ -137,8 +148,17 @@ export function DialInAdjustmentScreen({ sessionId, eventId }: Props) {
       )}
 
       {session.events.length >= 2 && (
-        <button className="text-btn" onClick={() => navigate({ id: 'converge', sessionId })}>
-          📊 View progress
+        <button
+          className="text-btn progress-link"
+          onClick={() => navigate({ id: "converge", sessionId })}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 18V6" />
+            <path d="M4 18H20" />
+            <path d="M7 15L11 11L14 13L20 7" />
+            <path d="M16 7H20V11" />
+          </svg>
+          <span>View progress</span>
         </button>
       )}
 

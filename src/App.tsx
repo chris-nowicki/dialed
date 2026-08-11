@@ -33,8 +33,14 @@ export function App() {
       return <ResearchingScreen beanId={screen.beanId} />;
     case 'bean-detail':
       return <BeanDetailScreen beanId={screen.beanId} />;
-    case 'edit-settings':
-      return <EditSettingsScreen beanId={screen.beanId} brewSize={screen.brewSize} recipeId={screen.recipeId} />;
+    case "edit-settings":
+      return (
+        <EditSettingsScreen
+          beanId={screen.beanId}
+          brewVariant={screen.brewVariant}
+          recipeId={screen.recipeId}
+        />
+      );
     case 'guided-brew':
       return <GuidedBrewFlow recipeId={screen.recipeId} mode={screen.mode} />;
     case 'taste':
