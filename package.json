@@ -1,29 +1,38 @@
 {
   "name": "dialed",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "Coffee dial-in coach for Fellow Aiden + Opus V1",
   "packageManager": "pnpm@11.20.0",
+  "tapMiniapp": {
+    "output": "dist"
+  },
   "engines": {
     "node": ">=20",
     "pnpm": ">=10.33.1"
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "dev": "rsbuild dev",
-    "build": "rsbuild build",
+    "dev": "tap-miniapp dev",
+    "dev:legacy": "rsbuild dev",
+    "build": "pnpm run build:miniapp",
+    "build:miniapp": "tap-miniapp build",
+    "build:target": "rslib build",
+    "build:legacy-zephyr": "rsbuild build",
+    "check:tap": "tap-miniapp check",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "preview": "rsbuild preview"
   },
   "dependencies": {
-    "@theaiplatform/miniapp-sdk": "^0.7.0",
+    "@theaiplatform/miniapp-sdk": "0.7.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@module-federation/rsbuild-plugin": "^2.8.2",
+    "@rslib/core": "^0.23.2",
     "@rsbuild/core": "^2.1.0",
     "@rsbuild/plugin-react": "^2.1.0",
     "@types/node": "^26.2.0",

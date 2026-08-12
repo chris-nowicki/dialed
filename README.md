@@ -50,7 +50,7 @@ Grinders don't agree with each other — "6" on a Fellow Opus is not "6" on an O
 
 - **The AI Platform Miniapp SDK** (`@theaiplatform/miniapp-sdk`) — webview surface, user-scoped storage, agent + network capabilities
 - **React 19 + TypeScript**
-- **Rsbuild** (Module Federation) — builds an immutable, hot-swappable release
+- **Rslib + Module Federation** — builds an immutable, descriptor-backed TAP package
 - **pnpm** (enforced — `npm`/`yarn` are blocked)
 - Delivered via **Zephyr Cloud** with live/OTA updates
 
@@ -76,13 +76,14 @@ OPENAI_API_KEY=sk-...
 | Command | Does |
 |---|---|
 | `pnpm dev` | Dev build + watch, linked into the platform |
-| `pnpm build` | Production immutable release (→ Zephyr Cloud) |
+| `pnpm build` | Build and verify the local TAP package in `dist/` |
+| `pnpm check:tap` | Run the complete TAP build and verification path without replacing `dist/` |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm preview` | Preview a production build |
 
 ### Deploy
 
-`pnpm build` publishes an immutable release to Zephyr Cloud; the platform *follows* your `development` environment and hot-swaps it. Promote to `production` by pinning the verified version. See [`DEPLOY.md`](./DEPLOY.md) for the full runbook.
+`pnpm build` is local-only: it assembles `dist/manifest.tap.json`, the desktop/mobile Federation targets, integrity locks, and the host surface shell. A TAP publisher adapter still needs to be configured before `tap-miniapp publish` can send this package to Zephyr Cloud. The former standalone Rsbuild + Zephyr path remains available as `pnpm build:legacy-zephyr`, but it does not produce a descriptor-backed TAP package.
 
 ## Project structure
 
