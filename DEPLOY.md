@@ -1,5 +1,7 @@
 # Deploy Runbook — Dialed
 
+> **Migration note:** this documents the former standalone Rsbuild + Zephyr flow. The default `pnpm build` now creates a verified TAP package locally. Cloud publication requires configuring the TAP SDK's Zephyr publisher adapter; `pnpm build:legacy-zephyr` retains the old deployment path but does not publish the descriptor-backed package.
+
 How Dialed ships to The AI Platform. Mini apps deploy as **immutable Module-Federation releases** published to **Zephyr Cloud**; the platform *follows* a Zephyr environment and hot-swaps the running code. Publishing **is** updating.
 
 > **For a booth/laptop demo you may not need this at all** — `pnpm dev` + a linked Local Directory is a legitimate live demo path. Deploy only when it needs to run off your machine.
